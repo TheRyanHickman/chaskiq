@@ -79,7 +79,7 @@ function App ({ dispatch, loading }) {
               <div className="rounded-lg h-96">
                 <div className="mt-10 mx-auto max-w-screen-xl px-4 sm:mt-12 sm:px-6 md:mt-16 lg:mt-20 lg:px-8 xl:mt-28">
                   <div className="sm:text-center lg:text-left">
-                    <img src={logo} alt="logo" />
+                    <img src="http://flowmetricsful.wpengine.com/wp-content/uploads/2020/09/flow_metrics_lime.png" alt="logo" />
 
                     <h2 className="text-4xl tracking-tight leading-10 font-extrabold text-gray-900 sm:text-5xl sm:leading-none md:text-6xl">
                       {I18n.t('home.welcome')} <br className="xl:hidden" />
