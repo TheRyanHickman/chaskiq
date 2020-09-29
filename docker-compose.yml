@@ -68,7 +68,7 @@ services:
       - postgres:/var/lib/postgresql/data
       - ./log:/root/log:cached
     environment:
-      POSTGRES_USER: postgresql
+      POSTGRES_USER: postgres
       PSQL_HISTFILE: /root/log/.psql_history
     ports:
       - 5432
