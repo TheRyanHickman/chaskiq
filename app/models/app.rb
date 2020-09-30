@@ -210,7 +210,7 @@ class App < ApplicationRecord
   end
 
   def create_agent_bot
-    add_bot_agent(email: "bot@#{id}-chaskiq", name: 'chaskiq bot')
+    add_bot_agent(email: "bot@#{id}-flow", name: 'flow bot')
   end
 
   def add_admin(attrs)

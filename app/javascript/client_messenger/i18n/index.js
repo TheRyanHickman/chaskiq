@@ -10,7 +10,7 @@ i18n
     resources: {
       en: {
         translations: {
-          runon: "We run on Chaskiq",
+          runon: "We run on FlowMetrics",
           conversations: 'Conversations',
           'conversation_block.choosen': 'You replied <strong>{{field}}</strong>',
 
@@ -52,7 +52,7 @@ i18n
       },
       es: {
         translations: {
-          runon: "Usamos Chaskiq",
+          runon: "FlowMetrics",
           conversations: 'Conversaciones',
           'conversations.events.assigned': '{{name}} fue asignado a esta conversación',
           'conversation_block.choosen': 'respondiste <strong>{{field}}</strong>',
