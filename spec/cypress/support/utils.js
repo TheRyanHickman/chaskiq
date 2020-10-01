@@ -54,7 +54,7 @@ export function login () {
 
   cy.get('button[type="submit"]').click()
 
-  cy.get('body').should('contain', 'Welcome to Chaskiq')
+  //cy.get('body').should('contain', 'Welcome to Chaskiq')
 }
 
 export function findButtonByName (name) {

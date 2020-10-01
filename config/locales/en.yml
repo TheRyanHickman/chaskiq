@@ -32,7 +32,7 @@ en:
     send_on_enter: Publish on enter
   home:
     welcome: Welcome to
-    welcome_site: Chaskiq
+    welcome_site: Flowmetrics
     tagline: Find your current applications here
     create_new: Create new app
     choose_lang: Choose language
