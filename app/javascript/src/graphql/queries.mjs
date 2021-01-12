@@ -1,3 +1,11 @@
+import {
+  conversationFragment,
+  conversationAttributesFragment,
+  converstionMessagesFragment,
+  conversationLastMessageFragment,
+  appFragment
+} from './fragments.mjs'
+
 export const APPS = `
 query Apps{
   apps{
@@ -12,40 +20,7 @@ query Apps{
 export const APP = `
   query App($appKey: String!){
     app(key: $appKey) {
-      encryptionKey
-      key
-      name
-      preferences
-      logo
-      enableArticlesOnWidget
-      inlineNewConversations
-      timezone
-      domainUrl
-      activeMessenger
-      theme
-      translations
-      availableLanguages
-      teamSchedule
-      replyTime
-      customizationColors
-      inboundSettings
-      emailRequirement
-      leadTasksSettings
-      userTasksSettings
-      gatherSocialData
-      registerVisits
-      domainUrl
-      outgoingEmailDomain
-      customFields
-      tagList
-      subscriptionsEnabled
-      segments {
-        name
-        id
-        properties
-      }
-      state
-      tagline
+      ${appFragment}
     }
   }
 `;
@@ -106,6 +81,7 @@ export const AGENTS = `
         name
         email
         displayName
+        avatarUrl
       }
     }
   }
@@ -225,11 +201,11 @@ export const SEGMENT = `
 
 
 export const CONVERSATIONS = `
-  query App($appKey: String!, $page: Int!, $sort: String, $filter: String, $agentId: Int, $tag: String){
+  query App($appKey: String!, $page: Int!, $sort: String, $filter: String, $agentId: Int, $tag: String, $term: String){
     app(key: $appKey) {
       key
       name
-      conversations(page: $page, sort: $sort, filter: $filter, agentId: $agentId, tag: $tag){
+      conversations(page: $page, sort: $sort, filter: $filter, agentId: $agentId, tag: $tag, term: $term){
         collection{
           id
           key
@@ -305,66 +281,7 @@ export const CONVERSATION=`
     app(key: $appKey) {
       key
       name
-      conversation(id: $id){
-        id
-        key
-        state
-        readAt
-        priority
-        tagList
-        assignee {
-          id
-          email
-          avatarUrl
-        }
-        mainParticipant{
-          id
-          email
-          avatarUrl
-          properties
-          displayName
-          kind
-        }
-        
-        messages(page: $page){
-          collection{
-            id
-            stepId
-            triggerId
-            fromBot
-            message{
-              blocks
-              data
-              state
-              htmlContent
-              textContent
-              serializedContent
-              action
-            }
-            source
-            readAt
-            createdAt
-            privateNote
-            appUser{
-              id
-              email
-              avatarUrl
-              kind
-              displayName
-            }
-            source
-            messageSource {
-              name
-              state
-              fromName
-              fromEmail
-              serializedContent
-            }
-            emailMessageId
-          }
-          meta
-        }
-    }
+      ${conversationFragment}
   }
 }
 `;
@@ -375,47 +292,8 @@ export const CONVERSATION_WITH_LAST_MESSAGE=`
       key
       name
       conversation(id: $id){
-        id
-        key
-        state
-        readAt
-        priority
-        createdAt
-        tagList
-        lastMessage{
-          createdAt
-          source
-          triggerId
-          fromBot
-          readAt
-          message{
-            blocks
-            data
-            state
-            htmlContent
-            textContent
-            serializedContent
-          }
-          privateNote
-          messageSource{
-            id
-            type
-          }
-          appUser {
-            id
-            avatarUrl
-            email
-            kind
-            displayName
-          }
-        }
-        mainParticipant{
-          id
-          email
-          avatarUrl
-          displayName
-          properties
-        }
+        ${conversationAttributesFragment}
+        ${conversationLastMessageFragment}
       }
     }
   }
@@ -450,6 +328,7 @@ query AppUser($appKey: String!, $id: Int! ) {
       country
       lat
       lng
+      tagList
       postal
       webSessions
       timezone
@@ -493,25 +372,7 @@ query AppUserConversations($appKey: String!, $id: Int!, $page: Int, $per: Int){
             email
             avatarUrl
           }
-          lastMessage{
-            createdAt
-            readAt
-            appUser{
-              email
-              avatarUrl
-              id
-              kind
-              displayName
-            }
-            message{
-              blocks
-              data
-              state
-              serializedContent
-              htmlContent
-              textContent
-            }
-          }
+          ${conversationLastMessageFragment}
         }
       }
     } 
@@ -562,7 +423,7 @@ query Campaigns($appKey: String!, $mode: String!){
         description
         fromName
         fromEmail
-        replyEmail        
+        replyEmail
       }
       meta
     }
@@ -599,6 +460,7 @@ query Campaign($appKey: String!, $mode: String!, $id: String!){
       fromEmail
       replyEmail
       steps
+      bannerData
     }
   }
 }
@@ -696,9 +558,9 @@ export const ARTICLE_SETTINGS = `
 `;
 
 export const ARTICLES = `
-  query App($appKey: String!, $page: Int!, $per: Int, $lang: String, $mode: String){
+  query App($appKey: String!, $page: Int!, $per: Int, $lang: String, $mode: String, $search: String){
     app(key: $appKey) {
-      articles(page: $page, per: $per, lang: $lang, mode: $mode){
+      articles(page: $page, per: $per, lang: $lang, mode: $mode, search: $search){
         collection {
           id
           title
@@ -930,10 +792,100 @@ export const APP_PACKAGES = `
         definitions
         icon
         description
+        capabilities
       }
     }
   }
 `;
+
+export const AGENT_APP_PACKAGES = `
+  query App($appKey: String!){
+    app(key: $appKey) {
+      agentAppPackages{
+        id
+        name
+        state
+        icon
+        description
+        definitions
+        initializeUrl
+        configureUrl
+        submitUrl
+        sheetUrl
+        oauthUrl
+        capabilities
+      }
+    }
+  }
+`;
+
+export const APP_PACKAGE = `
+  query App($appKey: String!, $id: String!){
+    app(key: $appKey) {
+      appPackage(id: $id){
+        name
+        state
+        definitions
+        icon
+        description
+        capabilities
+      }
+    }
+  }
+`;
+
+export const AGENT_APP_PACKAGE = `
+  query App($appKey: String!, $id: String!){
+    app(key: $appKey) {
+      agentAppPackage(id: $id){
+        id
+        name
+        state
+        icon
+        description
+        definitions
+        initializeUrl
+        configureUrl
+        submitUrl
+        oauthUrl
+        sheetUrl
+        capabilities
+      }
+    }
+  }
+`;
+
+export const APP_PACKAGES_BY_CAPABILITY = `
+  query App($appKey: String!, $kind: String!) { 
+    app(key: $appKey){
+      appPackagesCapabilities(kind: $kind){
+        id
+        name
+        icon
+        state
+        definitions
+        description
+      }
+    }
+  }
+`;
+
+export const APP_PACKAGE_HOOK = `
+  query App($appKey: String!, $id: String!, $hooKind: String!, $ctx: Json!) { 
+    app(key: $appKey) {
+      appPackage(id: $id){
+        name
+        state
+        definitions
+        icon
+        description
+        callHook(kind: $hooKind, ctx: $ctx)
+      }
+    }
+  }
+`;
+
+
 
 export const EVENT_TYPES = `
   query App($appKey: String!){
@@ -980,6 +932,7 @@ export const APP_PACKAGE_INTEGRATIONS = `
         description
         hookUrl
         oauthAuthorize
+        capabilities
       }
     }
   }

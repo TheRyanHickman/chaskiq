@@ -15,6 +15,8 @@ import { updateRtcEvents } from '../../actions/rtc'
 import Progress from '../Progress'
 import Button from '../Button'
 import I18n from '../../shared/FakeI18n'
+import tw from 'twin.macro'
+import { DefinitionRenderer } from '../packageBlocks/components'
 import {
   getConversation,
   typingNotifier,
@@ -28,7 +30,9 @@ import {
   setLoading,
   updateConversationTagList
 } from '../../actions/conversation'
+
 import QuickRepliesDialog from './QuickReplyDialog'
+import ErrorBoundary from '../ErrorBoundary'
 
 import { successMessage } from '../../actions/status_messages'
 
@@ -75,6 +79,17 @@ const BgContainer = styled.div`
   background-image: radial-gradient(currentColor 2px, transparent 2px),radial-gradient(currentColor 2px, transparent 2px);
   background-size: calc(20 * 2px) calc(20 * 2px);
   background-position: 0 0,calc(10 * 2px) calc(10 * 2px);
+`
+
+const MessageItem = styled.div`
+  ${(props) => props.userOrAdmin === 'user'
+    ? tw`bg-white text-green-500` : props.privateNote
+      ? tw`bg-yellow-300 text-black`
+      : tw`bg-gray-900 text-white`
+
+  // `background: linear-gradient(45deg,#48d79b,#1dea94f2);` :
+  // `background: linear-gradient(45deg,#202020,#000000e6)`
+  }
 `
 
 function Conversation ({
@@ -263,7 +278,7 @@ function Conversation ({
   const renderMessage = (o, userOrAdmin) => {
     const message = o
     const messageContent = o.message
-    const key = `conversation-${conversation.id}-message-${o.id}`
+    const key = `conversation-${conversation.key}-message-${o.key}`
 
     const content = messageContent.serializedContent ? (
       <DraftRenderer
@@ -293,9 +308,9 @@ function Conversation ({
     const isAdmin = userOrAdmin === 'admin'
 
     return <div
-      id={`message-id-${message.id}`}
+      id={`message-id-${message.key}`}
       className={`flex items-start py-2 text-sm ${flow}`}
-      key={`conversations-messages/${message.id}`}>
+      key={`conversations-messages/${message.key}`}>
       {
         userOrAdmin === 'user' && <img
           alt={message.appUser.displayName}
@@ -304,44 +319,22 @@ function Conversation ({
           className={`cursor-pointer w-10 h-10 rounded ${avatarM}`}
         />
       }
-      <div
-        className={`${bgClass}
-        shadow-lg 
+      <MessageItem
+        userOrAdmin={userOrAdmin}
+        privateNote={message.privateNote}
+        className={`
+        shadow-md 
         flex-1 
         overflow-hidden-dis p-3 
-        rounded-md`}
+        rounded-md max-w-full`}
       >
         <div className="flex justify-between pb-4">
           <div className="flex items-center">
-            {
-              isAdmin && messageContent.serializedContent &&
-
-              <FilterMenu
-                options={[
-                  {
-                    title: I18n.t('quick_replies.add_as_dialog.title'),
-                    onClick: ()=> { addAsReply(messageContent.serializedContent) }
-                  }
-                ]}
-                value={null}
-                filterHandler={(e) => e.onClick && e.onClick() }
-                triggerButton={(handler) => (
-                  <Button variant="icon"
-                    onClick={handler}
-                    className="" >
-                    <MoreIcon className="text-gray-400"/>
-                  </Button>
-                )}
-                position={'left'}
-                origin={'bottom-0'}
-              />
-            }
-
             <span className={`font-bold ${textClass}`}>
               {message.appUser.displayName}
             </span>
           </div>
-          <span className={`text-xs ${textClass}`}>
+          <span className={`flex items-center text-xs ${textClass}`}>
             <Moment fromNow ago>
               {message.createdAt}
             </Moment>
@@ -356,14 +349,47 @@ function Conversation ({
                 <span>{I18n.t('conversation.messages.not_seen')}</span>
               )}
             </span>
+
+            {
+              isAdmin && messageContent.serializedContent &&
+
+              <FilterMenu
+                options={[
+                  {
+                    title: I18n.t('quick_replies.add_as_dialog.title'),
+                    onClick: () => { addAsReply(messageContent.serializedContent) }
+                  }
+                ]}
+                value={null}
+                filterHandler={(e) => e.onClick && e.onClick() }
+                triggerButton={(handler) => (
+                  <Button
+                    variant="icon"
+                    onClick={handler}
+                    className="ml-2">
+                    <MoreIcon className="text-gray-400"/>
+                  </Button>
+                )}
+                position={'right'}
+                origin={'bottom-0'}
+              />
+            }
+
           </span>
         </div>
 
         <EditorContainerMessageBubble>
           {content}
         </EditorContainerMessageBubble>
-      </div>
+      </MessageItem>
     </div>
+  }
+
+  const updatePackage = (data, cb) => {
+    // for now the only supported action for agent facing pkg will be the url link
+    if (data.field.action.type === 'url') {
+      return window.open(data.field.action.url, '_blank')
+    }
   }
 
   const renderBlockRepresentation = (block) => {
@@ -372,18 +398,28 @@ function Conversation ({
     let output = null
     switch (blocks.type) {
       case 'app_package':
+
         output = <div>
-          <p variant="overline">{blocks.appPackage}</p>
+          <p
+            className="text-gray-800 text-xs
+            font-bold uppercase tracking-wide">
+            {blocks.appPackage}
+          </p>
 
           <br />
 
-          <p variant={'caption'}>
+          {/* <p variant={'caption'}>
             {data && (
               <span
                 dangerouslySetInnerHTML={{ __html: data.formattedText }}
               />
             )}
-          </p>
+          </p> */}
+
+          <DefinitionRenderer
+            schema={blocks.schema}
+            updatePackage={updatePackage}
+          />
         </div>
         break
       case 'ask_option':
@@ -398,14 +434,23 @@ function Conversation ({
     return (
 
       <div
-        className={`bg-blue-400
+        style={{
+          opacity: 0.96
+        }}
+        className={`
+        w-full
+        bg-white
+        opacity-75
+        border
+        border-gray-400
+        shadow-lg
         flex 
         overflow-hidden p-2 
         rounded-md mx-auto
-        text-white`
+        text-gray-600`
         }
       >
-        <div className="flex flex-col justify-between">
+        <div className="w-full flex flex-col justify-between">
           {output}
         </div>
 
@@ -420,7 +465,9 @@ function Conversation ({
     const message = o
     const messageContent = o.message
 
-    if (o.message.state !== 'replied') {
+    if (blocks.type === 'app_package') {
+      // (o.message.state !== 'replied') {
+
       return <div
         id={`message-id-${message.id}`}
         className={'flex items-start py-2 text-sm'}
@@ -432,7 +479,11 @@ function Conversation ({
     }
 
     const item = o.message.data
-    if (!item) return 'replied'
+    if (!item)
+      return <p className="text-sm leading-5 font-medium text-gray-500">
+        waiting for reply
+      </p>
+    //JSON.stringify(o.message.data)
 
     // if(!o.fromBot) return
 
@@ -450,12 +501,6 @@ function Conversation ({
         break
       default:
         if (blocks.type === 'app_package') {
-          /* return Object.keys(o.message.data).map((k)=>{
-            const val = o.message.data[k]
-            if(typeof(val) != "string") return
-            return <p>{k}: {val}</p>
-          }) */
-
           blockElement = <div>
             <p variant="overline">{blocks.appPackage}</p>
 
@@ -543,7 +588,7 @@ function Conversation ({
         key={`conversations-messages/${message.id}`}>
 
         <div
-          className={`bg-yellow-400
+          className={`bg-yellow-300
           flex 
           overflow-hidden p-2 
           rounded-md mx-auto`
@@ -598,10 +643,24 @@ function Conversation ({
             className="block md:hidden">
             <LeftArrow/>
           </Link>
+
+
+          {
+            conversation.mainParticipant &&
+            !fixedSidebarOpen &&
+            <img onClick={handleUserSidebar} 
+              className="h-9 w-9 rounded-full mr-2 cursor-pointer"
+              src={conversation.mainParticipant.avatarUrl}
+              alt=""
+            />
+          }
           <h3 className="mb-1 text-xs text-grey-darkest">
             {I18n.t('conversation.with')}{' '}
             <br/>
-            <span className="font-extrabold" onClick={handleUserSidebar}>
+            <span className="font-extrabold hover:text-underline"
+              onClick={toggleFixedSidebar}
+              //onClick={handleUserSidebar}
+              >
               {
                 conversation.mainParticipant &&
                 conversation.mainParticipant.displayName
@@ -639,9 +698,9 @@ function Conversation ({
                 outline-none 
                 mr-1 rounded-full 
                 ${
-                  conversation.state === 'closed' ?
-                  'bg-green-600 border-green-700 hover:bg-green-700 hover:border-green-800 text-gray-100' :
-                  'bg-white hover:bg-gray-100 text-gray-800'
+                  conversation.state === 'closed'
+                  ? 'bg-green-600 border-green-700 hover:bg-green-700 hover:border-green-800 text-gray-100'
+                  : 'bg-white hover:bg-gray-100 text-gray-800'
                 }
                  
                 font-semibold 
@@ -806,63 +865,64 @@ function Conversation ({
         className="overflow-y-scroll"
         onScroll={handleScroll}
         style={{
-          height: 'calc(100vh - 222px)'
-        }}
-      >
+          height: 'calc(100vh - 220px)'
+        }}>
         <div
           className="flex flex-col-reverse px-6 py-4">
-          {conversation &&
-            conversation.collection &&
-            conversation.collection.map((message) => {
-              const isReplied = message.message.state === 'replied'
-              const userOrAdmin =
-                !isReplied && message.appUser && message.appUser.kind === 'agent'
-                  ? 'admin'
-                  : 'user'
-              const appuserId = conversation.mainParticipant.id
+          <ErrorBoundary>
+            {conversation &&
+              conversation.collection &&
+              conversation.collection.map((message) => {
+                const isReplied = message.message.state === 'replied'
+                const userOrAdmin =
+                  !isReplied && message.appUser && message.appUser.kind === 'agent'
+                    ? 'admin'
+                    : 'user'
+                const appuserId = conversation.mainParticipant.id
 
-              return (
-                <MessageItemWrapper
-                  key={`message-item-${conversation.key}-${message.id}`}
-                  data={message}
-                  events={events}
-                  conversation={conversation}
-                  email={current_user.email}
-                >
-
-                  <ThemeProvider
-                    theme={
-                      userOrAdmin === 'admin'
-                        ? message.privateNote
-                          ? theme
-                          : themeDark
-                        : theme
-                    }
+                return (
+                  <MessageItemWrapper
+                    key={`message-item-${conversation.key}-${message.key}`}
+                    data={message}
+                    events={events}
+                    conversation={conversation}
+                    email={current_user.email}
                   >
 
-                    {
-                      message.message.blocks
-                        ? renderBlocks(message, userOrAdmin)
-                        : message.message.action
-                          ? renderEventBlock(message, userOrAdmin)
-                          : renderMessage(message, userOrAdmin)
-                    }
-                  </ThemeProvider>
-                </MessageItemWrapper>
-              )
-            })}
+                    <ThemeProvider
+                      theme={
+                        userOrAdmin === 'admin'
+                          ? message.privateNote
+                            ? theme
+                            : themeDark
+                          : theme
+                      }
+                    >
 
-          {
-            conversation.loading &&
-              <div className="m-2">
-                <Progress size="4"/>
-              </div>
-          }
+                      {
+                        message.message.blocks
+                          ? renderBlocks(message, userOrAdmin)
+                          : message.message.action
+                            ? renderEventBlock(message, userOrAdmin)
+                            : renderMessage(message, userOrAdmin)
+                      }
+                    </ThemeProvider>
+                  </MessageItemWrapper>
+                )
+              })}
+
+            {
+              conversation.loading &&
+                <div className="m-2">
+                  <Progress size="4"/>
+                </div>
+            }
+          </ErrorBoundary>
         </div>
       </div>
 
       <div className="pb-3 px-4 flex-none mt-auto">
-        <div className="bg-white flex rounded-lg border-2 border-grey overflow-hidden shadow-lg">
+        <div className="bg-white flex rounded-lg border border-grey overflow-hidden shadow-lg">
           {/* <span className="text-3xl text-grey border-r-2 border-grey p-2">
               <svg className="fill-current h-6 w-6 block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M16 10c0 .553-.048 1-.601 1H11v4.399c0 .552-.447.601-1 .601-.553 0-1-.049-1-.601V11H4.601C4.049 11 4 10.553 4 10c0-.553.049-1 .601-1H9V4.601C9 4.048 9.447 4 10 4c.553 0 1 .048 1 .601V9h4.399c.553 0 .601.447.601 1z"></path></svg>
               </span> */}
@@ -883,7 +943,7 @@ function Conversation ({
       <QuickRepliesDialog
         title={ I18n.t('quick_reply.add_as_dialog.title') }
         closeHandler={
-          ()=> setQuickReplyDialogOpen(null)
+          () => setQuickReplyDialogOpen(null)
         }
         open={quickReplyDialogOpen}>
       </QuickRepliesDialog>
@@ -895,6 +955,10 @@ function Conversation ({
 function MessageItemWrapper ({ conversation, data, events, children }) {
   React.useEffect(() => {
     // mark as read on first render
+    setTimeout(sendRead, 300)
+  }, [])
+
+  function sendRead () {
     if (!data.readAt) {
       events &&
         events.perform(
@@ -902,14 +966,14 @@ function MessageItemWrapper ({ conversation, data, events, children }) {
           Object.assign(
             {},
             {
-              conversation_id: conversation.id,
-              message_id: data.id
+              conversation_key: conversation.key,
+              message_key: data.key
             },
             { email: data.email }
           )
         )
     }
-  }, [])
+  }
 
   return <React.Fragment>{children}</React.Fragment>
 }

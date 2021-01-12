@@ -1,22 +1,19 @@
 import React, { useState, useEffect } from 'react'
 import styled from '@emotion/styled'
+import tw from 'twin.macro'
 import {
   AnchorButton,
   FadeRightAnimation,
-  FooterAck,
-  Spinner,
+
   CountBadge
 } from './styles/styled'
 import sanitizeHtml from 'sanitize-html'
 import { CommentsItemComp } from './conversation'
 import { textColor } from './styles/utils'
 import Loader from './loader'
+import { DefinitionRenderer } from '../src/components/packageBlocks/components'
 
 // import graphql from './graphql/client'
-import {
-  ARTICLES,
-  SEARCH_ARTICLES
-} from './graphql/queries'
 
 import { lighten } from 'polished'
 
@@ -30,87 +27,53 @@ const HomePanel = ({
   agents,
   t,
   graphqlClient,
+  displayAppBlockFrame,
   displayConversation,
   conversations,
+  conversationsMeta,
   getConversations,
   lang,
-  newMessages
+  newMessages,
+  getPackage,
+  homeHeaderRef
 }) => {
   const [loading, setLoading] = useState(false)
-  const [articles, setArticles] = useState([])
 
   const [conversationLoading, setConversationLoading] = useState(false)
 
   const [meta, setMeta] = useState({})
 
-  let textInput = React.createRef()
-
-  useEffect(() => (
-    updateHeader(
-      {
-        translateY: -25,
-        opacity: 1,
-        height: '212px'
-      }
-    )
-  ), [])
+  const textInput = React.createRef()
 
   useEffect(() => {
-    if (appData.articleSettings.subdomain) { getArticles() }
+    updateHeader(
+      {
+        translateY: -8,
+        opacity: 1,
+        height: homeHeaderRef.current.offsetHeight
+      }
+    )
   }, [])
 
   useEffect(() => {
     // if(!appData.inboundSettings.enabled )
     setConversationLoading(true)
 
-    getConversations({ page: 1, per: 1 }, () => {
+    getConversations({ page: 1, per: 3 }, () => {
       setConversationLoading(false)
     })
   }, [])
 
-  function shouldDisplayArticles () {
-    return appData.enableArticlesOnWidget
-  }
-
-  const getArticles = () => {
-    if (!shouldDisplayArticles()) {
-      return
-    }
-
-    setLoading(true)
-
-    graphqlClient.send(ARTICLES, {
-      domain: appData.articleSettings.subdomain,
-      lang: lang,
-      page: 1,
-      per: 5
-    }, {
-      success: (data) => {
-        const { collection, meta } = data.helpCenter.articles
-        setArticles(collection)
-        setLoading(false)
-        setMeta(meta)
-      },
-      error: (err) => {
-        console.log('ERR', err)
-        setLoading(false)
-        // debugger
-      }
-    })
-  }
-
   const handleScroll = (e) => {
     window.a = e.target
     const target = e.target
-    const val = 1 - normalize(target.scrollTop, target.offsetHeight, 0)
-    const pge = percentage(target.scrollTop, target.offsetHeight)
-    // console.log(val)
-    const opacity = val === 1 ? val : val * 0.3
-
+    const opacity = 1 - normalize(target.scrollTop, target.offsetHeight * 0.26, 0)
+    const pge = percentage(target.scrollTop, target.offsetHeight * 0.7)
+    //console.log("AAAA", val)
     updateHeader({
-      translateY: -pge - 25,
+      translateY: -pge - 8,
       opacity: opacity,
-      height: '212px'
+      height: homeHeaderRef.current.offsetHeight
     })
   }
 
@@ -120,34 +83,6 @@ const HomePanel = ({
 
   const percentage = (partialValue, totalValue) => {
     return (100 * partialValue) / totalValue
-  }
-
-  function handleSearch (e) {
-    console.log(textInput.value)
-    if (e.keyCode === 13) {
-      searchArticles(textInput.value)
-    }
-  }
-
-  function searchArticles (term) {
-    setLoading(true)
-    graphqlClient.send(SEARCH_ARTICLES, {
-      domain: appData.articleSettings.subdomain,
-      term: term,
-      lang: lang,
-      page: 1,
-      per: 5
-    }, {
-      success: (data) => {
-        const { collection, meta } = data.helpCenter.search
-        setArticles(collection)
-        setMeta(meta)
-        setLoading(false)
-      },
-      error: () => {
-        setLoading(true)
-      }
-    })
   }
 
   function renderAvailability () {
@@ -235,16 +170,52 @@ const HomePanel = ({
           />
         })
       }
+
+      {
+        conversationsMeta.next_page &&
+          <CardFooterLinks>
+            <button onClick={viewConversations}>
+              {t('view_all_conversations')}
+            </button>
+          </CardFooterLinks>
+      }
     </CardContent>
+  }
+
+  function offsetHeight (){
+    if(!homeHeaderRef.current) return 0
+    return homeHeaderRef.current.offsetHeight - 35
   }
 
   return (
 
+    
+
     <Panel onScroll={handleScroll}>
+
+
+
+
+      { conversations.length > 0 &&
+        <ConversationInitiator
+          style={{
+            marginTop: offsetHeight()
+          }}
+          in={transition}>
+          <CardPadder>
+            <h2>{t('continue_conversation')}</h2>
+          </CardPadder>
+          {renderLastConversation()}
+        </ConversationInitiator>
+      }
 
       {
         appData.inboundSettings.enabled &&
-        <ConversationInitiator in={transition}>
+        <ConversationInitiator
+          style={{
+            marginTop: conversations.length > 0 ? 0 : offsetHeight()
+          }}
+          in={transition}>
 
           <CardPadder>
             <h2>{t('start_conversation')}</h2>
@@ -287,12 +258,11 @@ const HomePanel = ({
 
           </CardPadder>
 
-          { conversations.length > 0 && <React.Fragment>
-            {renderLastConversation()}
-          </React.Fragment>
-          }
-
-
+          { /* conversations.length > 0 &&
+            <React.Fragment>
+             {renderLastConversation()}
+            </React.Fragment>
+          */ }
 
         </ConversationInitiator>
       }
@@ -309,85 +279,97 @@ const HomePanel = ({
                 </CountBadge>
               }
 
-              <a className="see_previous" 
+              <a className="see_previous"
                 href="#" onClick={viewConversations}>
                 {t('see_previous')}
               </a>
+
             </CardButtonsGroup>
             {renderLastConversation()}
           </ConversationsBlock>
       }
 
-      {
-        shouldDisplayArticles() &&
-          <Card in={transition}>
-            <p>{t('search_article_title')}</p>
-            <ButtonWrapper>
-              <input ref={(ref) => textInput = ref}
-                placeholder={ t('search_articles') }
-                onKeyDown={handleSearch}
-              />
-              <button onClick={() => searchArticles(textInput.value)}>
-                {loading ? <Spinner/> : 'go' }
-              </button>
-            </ButtonWrapper>
-          </Card>
-      }
-
       { loading && <Loader xs></Loader>}
 
-      { articles.length > 0 && <ArticleList>
-
-        <ArticlePadder>
-          <h2>
-            {t('latest_articles')}
-          </h2>
-
-          {
-            articles.map((article, i) => (
-              <ArticleCard key={`article-card-${article.id}`}
-                article={article}
-                displayArticle={displayArticle}
-              />
-            ))
-          }
-
-        </ArticlePadder>
-
-      </ArticleList>
+      {
+        appData.homeApps && appData.homeApps.map((o, i) => (
+          <AppPackageRenderer
+            pkg={o}
+            key={`package-renderer-${o.name}-${i}`}
+            app={appData}
+            displayAppBlockFrame={displayAppBlockFrame}
+            transition={transition}
+            getPackage={getPackage}
+          />
+        ))
       }
 
     </Panel>
   )
 }
 
-const ArticleCard = ({ article, displayArticle }) => {
-  return (
+function AppPackageRenderer ({
+  app,
+  pkg,
+  getPackage,
+  transition,
+  displayAppBlockFrame
+}) {
+  const [definitions, setDefinitions] = React.useState(pkg.definitions)
 
-    <ArticleCardWrapper onClick={(e) => displayArticle(e, article) }>
+  function updatePackage (packageParams, cb) {
+    if (packageParams.field.action.type === 'frame') {
+      return displayAppBlockFrame({
+        message: {},
+        data: {
+          field: packageParams.field,
+          location: packageParams.location,
+          id: pkg.name,
+          appKey: app.key,
+          values: { ...pkg.values, ...packageParams.values }
+        }
+      })
+    }
 
-      <ArticleCardTitle>
-        {article.title}
-      </ArticleCardTitle>
+    if (packageParams.field.action.type === 'url') {
+      return window.open(packageParams.field.action.url)
+    }
 
-      <ArticleCardContent>
-        {article.description}
-      </ArticleCardContent>
+    const params = {
+      id: pkg.name,
+      appKey: app.key,
+      hooKind: packageParams.field.action.type,
+      ctx: {
+        field: packageParams.field,
+        location: packageParams.location,
+        value: packageParams.values
+      }
+    }
+    getPackage(params, (data) => {
+      const defs = data.messenger.app.appPackage.callHook.definitions
+      setDefinitions(defs)
+      cb && cb()
+    })
+  }
 
-    </ArticleCardWrapper>
-
-  )
+  return <Card in={transition} key={`definition-${pkg.id}`}>
+    <DefinitionRenderer
+      schema={definitions}
+      updatePackage={updatePackage}
+    />
+  </Card>
 }
 
 const Panel = styled.div`
   position: fixed;
-  top: 34px;
+  //top: 34px;
+  top: 0px;
   bottom: 0px;
   left: 0px;
   right: 0px;
   overflow: scroll;
   width: 100%;
-  height: 90%;
+  height: 94%;
   z-index: 1000;
 `
 
@@ -474,24 +456,30 @@ const Card = styled.div`
   box-shadow: 0 4px 15px 0 rgba(0,0,0,.1), 0 1px 2px 0 rgba(0,0,0,.1), inset 0 2px 0 0 ${(props) => { lighten(0.1, props.theme.palette.secondary) }};
 
   margin: 1em;
-  padding: 2em;
+  ${(props) => props.padding ? 'padding: 2em;' : ''}
 
   ${(props) => FadeRightAnimation(props)}
-
 `
 
 const ConversationInitiator = styled(Card)`
-  margin-top: 10em;
+  //margin-top: 10em;
   padding: 0;
   h2{
     font-size: 1.2em;
     font-weight: 500;
-    margin: .4em 0 0.4em 0em;
+    //margin: .4em 0 0.4em 0em;
   }
 `
 
 const CardPadder = styled.div`
-  padding: 2em;
+  ${() => tw`space-y-2 p-5` }
+`
+
+const CardFooterLinks = styled.div`
+  ${() => tw`px-4 py-2` }
+  button {
+    ${() => tw`text-xs font-medium` }
+  }
 `
 
 const ConversationsBlock = styled(Card)`
@@ -513,7 +501,6 @@ const ConnectedPeople = styled.div`
 `
 
 const ArticleList = styled.div`
-  
   background: white;
   h2{
     font-size: 1.2em;

@@ -11,6 +11,8 @@ import serialize from 'form-serialize'
 import UnicornEditor from './textEditor'
 import {isEmpty} from 'lodash'
 import Loader from './loader'
+import {toCamelCase} from './shared/caseConverter'
+import ErrorBoundary from '../src/components/ErrorBoundary'
 import {
   EditorSection,
   CommentsWrapper,
@@ -33,8 +35,14 @@ import {
   AppPackageBlockContainer,
   ConversationEventContainer,
   InlineConversationWrapper,
-  FooterAckInline
+  FooterAckInline,
+  DisabledElement,
+  NewConvoBtnContainer
 } from './styles/styled'
+
+import {
+  DefinitionRenderer
+} from '../src/components/packageBlocks/components'
 
 const DanteStylesExtend  = styled(DanteContainer)`
 .graf--code{
@@ -42,6 +50,9 @@ const DanteStylesExtend  = styled(DanteContainer)`
   overflow: auto
 }
 `
+
+
+
 
 export class Conversations extends Component {
 
@@ -123,11 +134,13 @@ export class Conversations extends Component {
 
           {
             this.props.app.inboundSettings.enabled &&
-            <NewConvoBtn
-              in={this.props.transition}
-              onClick={this.props.displayNewConversation}>
-              {t("create_new_conversation")}
-            </NewConvoBtn> 
+            <NewConvoBtnContainer>
+              <NewConvoBtn
+                in={this.props.transition}
+                onClick={this.props.displayNewConversation}>
+                {t("create_new_conversation")}
+              </NewConvoBtn>
+            </NewConvoBtnContainer>
           }
         </ConversationsFooter>
 
@@ -152,8 +165,6 @@ export class Conversation extends Component {
 
     this.inlineIframe = null
   }
-
-
 
   componentWillUnmount(){
     // todop porque?
@@ -183,6 +194,102 @@ export class Conversation extends Component {
     }
   }
 
+  appPackageBlockDisplay = (message)=>{
+    this.props.displayAppBlockFrame(message)
+  }
+
+  appPackageClickHandler = (item, message)=>{
+    if (message.message.blocks.type === "app_package") 
+      return this.appPackageBlockDisplay(message)
+    this.props.pushEvent('trigger_step', {
+      conversation_key: this.props.conversation.key,
+      message_key: message.key,
+      trigger: message.triggerId,
+      step: item.nextStepUuid || item.next_step_uuid,
+      reply: item
+    })
+  }
+
+  appPackageSubmitHandler = (data, message)=>{
+    this.props.pushEvent("receive_conversation_part", 
+      {
+        conversation_key: this.props.conversation.key,
+        message_key: message.key,
+        step: message.stepId,
+        trigger: message.TriggerId,
+        ...data
+      })
+  }
+
+  renderTyping = ()=>{
+    return <MessageItem>
+
+            <div className="message-content-wrapper">
+              <MessageSpinner>
+                <div className={"bounce1"}/>
+                <div className={"bounce2"}/>
+                <div className={"bounce3"}/>
+              </MessageSpinner>
+              <span style={{
+                fontSize: '0.7rem', 
+                color: '#afabb3'}}>
+                {
+                  this.props.t("is_typing", {
+                    name: this.props.agent_typing.author.name || 'agent' 
+                  })
+                }
+              </span>
+            </div>
+
+           </MessageItem>
+  }
+
+  isInputEnabled =()=>{
+    
+    if(isEmpty(this.props.conversation.messages)) return true
+    
+    const messages = this.props.conversation.messages.collection
+    if( messages.length === 0 ) return true
+    
+    const message = messages[0].message
+    if(isEmpty(message.blocks)) return true
+    if(message.blocks && message.blocks.type === "wait_for_reply") return true
+   
+    // strict comparison of false
+    if(message.blocks && message.blocks.wait_for_input === false) return true
+    if(message.blocks && message.blocks.waitForInput === false) return true
+
+    return message.state === "replied"
+  }
+  
+  renderInlineCommentWrapper = ()=>{
+    return  <div ref={comp => this.props.setOverflow(comp) }
+                onScroll={this.handleConversationScroll}
+                style={{ 
+                  overflowY: 'auto', 
+                  height: '86vh', 
+                  position: 'absolute' ,
+                  width: '100%',
+                  zIndex: '20'
+              }}>
+              <CommentsWrapper
+                isReverse={true}
+                isInline={this.props.inline_conversation}
+                ref={comp => this.props.setInlineOverflow(comp)}
+                isMobile={this.props.isMobile}>
+                {this.renderMessages()}
+              </CommentsWrapper>
+            </div>
+  }
+
+  renderCommentWrapper = ()=>{
+    return  <CommentsWrapper
+              isReverse={true}
+              isMobile={this.props.isMobile}>
+              {this.renderMessages()}
+            </CommentsWrapper>
+  }
+
   renderMessage = (o, i)=>{
     const userClass = o.appUser.kind === "agent" ? 'admin' : 'user'
     const isAgent = o.appUser.kind === "agent"
@@ -192,7 +299,7 @@ export class Conversation extends Component {
     return <MessageItemWrapper
             visible={this.props.visible}
             email={this.props.email}
-            key={`conversation-${this.props.conversation.key}-item-${o.id}`}
+            key={`conversation-${this.props.conversation.key}-item-${o.key}`}
             conversation={this.props.conversation}
             pushEvent={this.props.pushEvent}
             data={o}>
@@ -257,10 +364,14 @@ export class Conversation extends Component {
                conversation={this.props.conversation}
                submitAppUserData={this.props.submitAppUserData.bind(this)}
                clickHandler={this.appPackageClickHandler.bind(this)}
-               appPackageSubmitHandler={this.appPackageSubmitHandler.bind(this)}
+               appPackageSubmitHandler={this.appPackageSubmitHandler}
                t={this.props.t}
+               updatePackage={this.updatePackage}
                searcheableFields={this.props.appData.searcheableFields}
-               {...o}
+
+               displayAppBlockFrame={this.props.displayAppBlockFrame}
+               getPackage={this.props.getPackage}
+               //{...o}
               />
   }
 
@@ -272,100 +383,6 @@ export class Conversation extends Component {
               {this.props.t(`conversations.events.${action}`, data)}
             </span>
            </ConversationEventContainer>
-  }
-
-  appPackageBlockDisplay = (message)=>{
-    this.props.displayAppBlockFrame(message)
-  }
-
-  appPackageClickHandler = (item, message)=>{
-    // run app block display here! refactor
-    if (message.message.blocks.type === "app_package") 
-      return this.appPackageBlockDisplay(message)
-    
-    this.props.pushEvent('trigger_step', {
-      conversation_id: this.props.conversation.key,
-      message_id: message.id,
-      trigger: message.triggerId,
-      step: item.nextStepUuid || item.next_step_uuid,
-      reply: item
-    })
-    
-  }
-
-  appPackageSubmitHandler = (data, message)=>{
-    this.props.pushEvent("receive_conversation_part", 
-      {
-        conversation_id: this.props.conversation.key,
-        message_id: message.id,
-        step: this.props.stepId,
-        trigger: this.props.TriggerId,
-        submit: data
-      })
-  }
-
-  renderTyping = ()=>{
-    return <MessageItem>
-
-            <div className="message-content-wrapper">
-              <MessageSpinner>
-                <div className={"bounce1"}/>
-                <div className={"bounce2"}/>
-                <div className={"bounce3"}/>
-              </MessageSpinner>
-              <span style={{
-                fontSize: '0.7rem', 
-                color: '#afabb3'}}>
-                {
-                  this.props.t("is_typing", {
-                    name: this.props.agent_typing.author.name || 'agent' 
-                  })
-                }
-              </span>
-            </div>
-
-           </MessageItem>
-  }
-
-  isInputEnabled =()=>{
-    
-    if(isEmpty(this.props.conversation.messages)) return true
-    
-    const messages = this.props.conversation.messages.collection
-    if( messages.length === 0 ) return true
-    
-    const message = messages[0].message
-    if(isEmpty(message.blocks)) return true
-    if(message.blocks && message.blocks.type === "wait_for_reply") return true
-    return message.state === "replied"
-  }
-  
-  renderInlineCommentWrapper = ()=>{
-    return  <div ref={comp => this.props.setOverflow(comp) }
-                onScroll={this.handleConversationScroll}
-                style={{ 
-                  overflowY: 'auto', 
-                  height: '86vh', 
-                  position: 'absolute' ,
-                  width: '100%',
-                  zIndex: '20'
-              }}>
-              <CommentsWrapper
-                isReverse={true}
-                isInline={this.props.inline_conversation}
-                ref={comp => this.props.setInlineOverflow(comp)}
-                isMobile={this.props.isMobile}>
-                {this.renderMessages()}
-              </CommentsWrapper>
-            </div>
-  }
-
-  renderCommentWrapper = ()=>{
-    return  <CommentsWrapper
-              isReverse={true}
-              isMobile={this.props.isMobile}>
-              {this.renderMessages()}
-            </CommentsWrapper>
   }
 
   renderMessages = ()=>{
@@ -386,7 +403,8 @@ export class Conversation extends Component {
 
 
     {
-      this.props.conversation.messages && this.props.conversation.messages.collection.map((o, i) => {
+      this.props.conversation.messages && 
+      this.props.conversation.messages.collection.map((o, i) => {
           if(o.message.blocks) return this.renderItemPackage(o, i)
           if(o.message.action) return this.renderEventBlock(o, i)
           return this.renderMessage(o, i)
@@ -420,8 +438,8 @@ export class Conversation extends Component {
 
     this.props.pushEvent("receive_conversation_part", 
     {
-      conversation_id: this.props.conversation.key,
-      message_id: message.id,
+      conversation_key: this.props.conversation.key,
+      message_key: message.key,
       step: message.stepId,
       trigger: message.triggerId,
       //submit: data
@@ -449,7 +467,6 @@ export class Conversation extends Component {
             }
           </Footer>
   }
-
 
   renderInline =()=>{
     return <div>
@@ -497,7 +514,10 @@ export class Conversation extends Component {
 class MessageItemWrapper extends Component {
   componentDidMount(){
     // mark as read on first render if not read & from admin
-    this.sendEvent()
+    setTimeout(()=>{
+      this.sendEvent()
+    }, 300)
+    
   }
 
   componentDidUpdate(prevProps, prevState){
@@ -512,8 +532,8 @@ class MessageItemWrapper extends Component {
       this.props.data.appUser.kind === "agent"){
       this.props.pushEvent("receive_conversation_part", 
         Object.assign({}, {
-          conversation_id: this.props.conversation.key,
-          message_id: this.props.data.id,
+          conversation_key: this.props.conversation.key,
+          message_key: this.props.data.key,
           step: this.props.stepId,
           trigger: this.props.TriggerId
         }, {email: this.props.email})
@@ -535,30 +555,93 @@ class AppPackageBlock extends Component {
   state = {
     value: null,
     errors: {},
-    loading: false
+    loading: false,
+    schema: this.props.message.message.blocks.schema
   }
 
   setLoading = (val)=>{
     this.setState({loading: val})
   }
 
-  renderElements = ()=>{
-    const isDisabled = this.props.message.state === "replied"
-    if(isDisabled) return this.renderDisabledElement() 
-    return this.props.message.blocks.schema.map((o, i)=>
-       this.renderElement(o, i)
-    )
-  }
-
   handleStepControlClick = (item)=>{
 
-    if(this.props.message.data && this.props.message.data.opener)
-      return window.open(this.props.message.data.opener)
+    if(this.props.message.message.data && this.props.message.message.data.opener)
+      return window.open(this.props.message.message.data.opener)
 
-    this.props.clickHandler(item, this.props)
+    this.props.clickHandler(item, this.props.message)
   }
 
-  sendAppPackageSubmit = (e)=>{
+  sendAppPackageSubmit = (data, cb)=>{
+    //if(data.field.action && data.field.action.type === 'frame')
+    //  this.props.clickHandler(data, this.props)
+    this.updatePackage(data, this.props.message, cb)
+  }
+
+  updatePackage = (data, message, cb)=> {
+
+    if(data.field.action.type === 'url'){
+      return window.open(data.field.action.url, '_blank'); 
+    }
+
+    if(data.field.action.type === 'frame'){
+      // todo: handle get package :eyes
+      this.props.displayAppBlockFrame({
+        message: message,
+        data: {
+          field: data.field,
+          id: message.message.blocks.app_package,
+          values: message.message.blocks.values,
+          message_key: message.key,
+          conversation_key: this.props.conversation.key
+        }
+      })
+      cb && cb()
+      return
+    }
+
+    const camelCasedMessage = toCamelCase(message.message)
+    const params = {
+      id: camelCasedMessage.blocks.appPackage,
+      hooKind: data.field.action.type,
+      ctx: {
+        field: data.field,
+        conversation_key: this.props.conversation.key,
+        message_key: message.key,
+        definitions: camelCasedMessage.blocks.schema,
+        step: this.props.stepId,
+        trigger: this.props.TriggerId,
+        values: data.values,
+      }
+    }
+
+    // handle steps on appPackageSubmitHandler
+
+    this.props.getPackage(params, (data) => {
+      if(!data)
+        return cb && cb()
+
+      const {definitions, kind, results} = data.messenger.app.appPackage.callHook
+      if(!results){
+        this.setState({schema: definitions}, cb && cb())
+      } else {
+        // this will hit messenger_events#receive_conversation_part
+        this.props.appPackageSubmitHandler(
+          {
+            submit: results, 
+            definitions: definitions
+          },
+          message
+        )
+        // independly on the result of appPackageSubmit
+        // we will update the state definitions on the block
+        // maybe this will work on updating the message from ws ??
+        this.setState({schema: definitions}, cb && cb())
+      }
+    })
+  }
+
+  // TODO: to be deprecated
+  sendAppPackageSubmit2 = (e)=>{
 
     if(this.state.loading) return
 
@@ -589,14 +672,14 @@ class AppPackageBlock extends Component {
       // console.log(this.state.errors)
       // console.log(isEmpty(this.state.errors) ? 'valid' : 'errors')
       if(!isEmpty(this.state.errors)) return
-      this.props.appPackageSubmitHandler(data, this.props)
+      this.props.appPackageSubmitHandler(data, this.props.message)
     })
 
   }
 
   renderEmptyItem = ()=>{
-    if(this.props.message.blocks.type === "app_package"){
-      return <p>{this.props.message.blocks.app_package} replied</p>
+    if(this.props.message.message.blocks.type === "app_package"){
+      return <p>{this.props.message.message.blocks.app_package} replied</p>
 
     }else{
       return <p>mo</p>
@@ -604,7 +687,7 @@ class AppPackageBlock extends Component {
   }
 
   renderDisabledElement = ()=>{
-    const item = this.props.message.data
+    const item = this.props.message.message.data
 
     if(!item) return this.renderEmptyItem()
 
@@ -612,7 +695,7 @@ class AppPackageBlock extends Component {
     
     switch(item.element){
       case "button":
-        if (this.props.message.blocks.type === "ask_option"){
+        if (this.props.message.message.blocks.type === "ask_option"){
           return <span dangerouslySetInnerHTML={{ 
             __html: this.props.t(`conversation_block.choosen`, {field: item.label} )
           }}/>
@@ -620,10 +703,10 @@ class AppPackageBlock extends Component {
 
       default:
 
-        const message = this.props.message
+        const message = this.props.message.message
         const {blocks, data} = message
 
-        if(this.props.message.blocks.type === "app_package"){
+        if(this.props.message.message.blocks.type === "app_package"){
           
           return <p>
                   <strong>
@@ -639,19 +722,20 @@ class AppPackageBlock extends Component {
                 </p>
         }
 
-        if (this.props.message.blocks.type === "data_retrieval"){
-          return Object.keys(this.props.message.data).map((k)=>{
-            return <p key={`data-retrieval-${k}`}>{k}: {this.props.message.data[k]}</p>
+        if (this.props.message.message.blocks.type === "data_retrieval"){
+          return Object.keys(this.props.message.message.data).map((k)=>{
+            return <p key={`data-retrieval-${k}`}>{k}: {this.props.message.message.data[k]}</p>
           })
         } else{
-          <p>{JSON.stringify(this.props.message.data)}</p>
+          <p>{JSON.stringify(this.props.message.message.data)}</p>
         }
     }
   }
 
+  // TODO: deprecate this in favor of appPackagesIntegration 
   renderElement = (item, index)=>{
     const element = item.element
-    const isDisabled = this.props.message.state === "replied" || this.state.loading
+    const isDisabled = this.props.message.message.state === "replied" || this.state.loading
     const {t} = this.props
     const key = `${item.type}-${index}`
     switch(item.element){
@@ -660,7 +744,14 @@ class AppPackageBlock extends Component {
       case "input":
         const isEmailType = item.name === "email" ? "email" : null
         const errorClass = this.state.errors[item.name] ? 'error' : ''
-        return <div className={`form-group ${errorClass}`} 
+        return <div 
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  padding: '1.2em'
+                }}
+                className={`form-group ${errorClass}`} 
                 key={key}>
                 <label>
                   {t("enter_your", {field: item.name })}
@@ -668,7 +759,7 @@ class AppPackageBlock extends Component {
                 <input 
                   disabled={isDisabled}
                   type={isEmailType || item.type} 
-                  name={item.name}
+                  name={`submit[${item.name}]`}
                   required
                   placeholder={t("enter_your", {field: item.name })}
                   //onKeyDown={(e)=>{ e.keyCode === 13 ? 
@@ -697,7 +788,7 @@ class AppPackageBlock extends Component {
             {t("submit")}
           </button>
       case "button":
-        return <div>
+        return <div style={{ padding: '0.2em 0.6em 0.4em 0.5em'}}>
                   <button 
                     disabled={isDisabled}
                     onClick={()=> this.handleStepControlClick(item)}
@@ -711,9 +802,21 @@ class AppPackageBlock extends Component {
     }
   }
 
+  renderElements = ()=>{
+    const isDisabled = this.props.message.message.state === "replied"
+    if(isDisabled) return <DisabledElement>
+                            { this.renderDisabledElement() }
+                          </DisabledElement>
+    return this.props.message.message.blocks.schema.map((o, i)=>
+      
+      this.renderElement(o, i)
+      
+    )
+  }
+
   isHidden=()=>{
     // will hide this kind of message since is only a placeholder from bot
-    return this.props.message.blocks.type === 'wait_for_reply'
+    return this.props.message.message.blocks.type === 'wait_for_reply'
   }
 
   render(){
@@ -721,14 +824,25 @@ class AppPackageBlock extends Component {
               isInline={this.props.isInline}
               isHidden={this.isHidden()}>
               {
-                true ? //!this.state.done ?
+                this.props.message.message.blocks.type === 'app_package' &&
+                <DefinitionRenderer
+                  schema={this.state.schema}
+                  updatePackage={
+                    (data, cb)=> this.sendAppPackageSubmit(data , cb )
+                  }
+                />
+              }
+
+              { 
+                this.props.message.message.blocks.type !== 'app_package' && 
                 <form ref={o => this.form } 
-                  onSubmit={ this.sendAppPackageSubmit }>
+                  onSubmit={ this.sendAppPackageSubmit2 }>
                   {
                     this.renderElements()
                   }
-                </form> : <p>aa</p>
+                </form> 
               }
+             
           </AppPackageBlockContainer>
 
   }
@@ -759,7 +873,13 @@ export function CommentsItemComp(props){
   function renderItemPackage(message){
     switch (message.message.blocks.type) {
       case 'app_package':
-        return <span>{message.message.blocks.app_package}</span>
+        let namespace = 'app_package_wait_reply'
+        const pkg = message.message.blocks.app_package
+        if( pkg.wait_for_input === false || pkg.waitForInput === false )
+          namespace = 'app_package_non_wait'
+
+        return t(`conversations.message_blocks.${namespace}`)
+        //return <span>{message.message.blocks.app_package}</span>
       case 'ask_option':
         return t(`conversations.message_blocks.ask_option`)
       case 'data_retrieval':
@@ -779,6 +899,8 @@ export function CommentsItemComp(props){
       string = d.blocks.map((block)=> block.text).join("\n")
     }
     
+    if(!string) return ''
+
     var trimmedString = string.length > length ? 
                         string.substring(0, length - 3) + "..." : 
                         string;
@@ -863,7 +985,9 @@ export function CommentsItemComp(props){
                               //}
                             }
 
-                            {renderMessages(message)}
+                            <ErrorBoundary>
+                              {renderMessages(message)}
+                            </ErrorBoundary>
 
                           </ConversationSummaryBodyContent>
 

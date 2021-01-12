@@ -10,11 +10,16 @@ i18n
     resources: {
       en: {
         translations: {
+<<<<<<< HEAD
           runon: "We run on FlowMetrics",
+=======
+          runon: 'We run on Chaskiq',
+>>>>>>> 17b18693ec9b6c28f756078fb26c898962012620
           conversations: 'Conversations',
           'conversation_block.choosen': 'You replied <strong>{{field}}</strong>',
-
+          continue_conversation: 'Continue the conversation',
           start_conversation: 'Start a conversation',
+          view_all_conversations: 'view all conversations',
           see_previous: 'See previous',
           search_article_title: "Find answers in our article's repository",
           search_articles: 'Search articles',
@@ -33,6 +38,8 @@ i18n
           'conversations.events.assigned': '{{name}} was assigned to this conversation',
           'conversations.message_blocks.ask_option': 'is waiting for your reply',
           'conversations.message_blocks.data_retrieval': 'is waiting for your reply',
+          'conversations.message_blocks.app_package_wait_reply': 'is waiting for your reply',
+          'conversations.message_blocks.app_package_non_wait': 'sent you a content',
 
           'reply_time.auto': 'The team will respond as soon as possible',
           'reply_time.minutes': 'The team usually responds in minutes',
@@ -52,13 +59,21 @@ i18n
       },
       es: {
         translations: {
+<<<<<<< HEAD
           runon: "FlowMetrics",
+=======
+          runon: 'Usamos Chaskiq',
+>>>>>>> 17b18693ec9b6c28f756078fb26c898962012620
           conversations: 'Conversaciones',
           'conversations.events.assigned': '{{name}} fue asignado a esta conversación',
           'conversation_block.choosen': 'respondiste <strong>{{field}}</strong>',
           'conversations.message_blocks.ask_option': 'está esperando tu respuesta',
           'conversations.message_blocks.data_retrieval': 'está esperando tu respuesta',
+          'conversations.message_blocks.app_package_wait_reply': 'está esperando tu respuesta',
+          'conversations.message_blocks.app_package_non_wait': 'envió un contenido',
+          continue_conversation: 'Continúa la conversación',
           start_conversation: 'Inicia una conversación',
+          view_all_conversations: 'ver todas las conversaciones',
           see_previous: 'Ver anteriores',
           search_article_title: 'Encuentra respuestas en nuestro centro de ayuda',
           search_articles: 'Busca artículos',

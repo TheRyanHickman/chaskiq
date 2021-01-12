@@ -3,6 +3,7 @@
 module Types
   class ConversationPartType < Types::BaseObject
     field :id, Integer, null: true
+    field :key, String, null: true
     field :message, Types::ConversationPartContentType, null: true
     # field :serialized_content, String, null: true
     # field :html_content, String, null: true
@@ -26,10 +27,10 @@ module Types
     end
 
     def app_user
-      #object.authorable
+      # object.authorable
       id = object.authorable_id
       key = object.authorable_type
-    
+
       BatchLoader::GraphQL.for(id).batch(key: key) do |ids, loader, args|
         model = Object.const_get(args[:key])
         model.where(id: ids).each { |record| loader.call(record.id, record) }
@@ -40,12 +41,12 @@ module Types
       # object.messageable
       id = object.messageable_id
       key = object.messageable_type
-    
+
       BatchLoader::GraphQL.for(id).batch(key: key) do |ids, loader, args|
         model = Object.const_get(args[:key])
-        model.where(id: ids).each { |record| 
-          loader.call(record.id, record) 
-        }
+        model.where(id: ids).each do |record|
+          loader.call(record.id, record)
+        end
       end
     end
   end

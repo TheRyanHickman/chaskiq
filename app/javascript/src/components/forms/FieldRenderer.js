@@ -4,7 +4,7 @@ import Input from "./Input";
 
 export const errorsFor = (name, errors) => {
   if (!errors[name]) return null;
-  //console.log("error for", name);
+  console.log("error for", name);
   return errors[name].map((o) => o).join(", ");
 };
 
@@ -27,12 +27,18 @@ class FieldRenderer extends React.Component {
       errors,
       errorNamespace,
       handler,
+      accept,
+      id
     } = this.props;
     const errorName = snakeCase(
       `${errorNamespace ? errorNamespace : ""}${data.name}`
     );
     const errorMessage = errorsFor(errorName, errors);
     const camelCasedName = camelCase(data.name)
+
+    function formatFieldName(){
+      return namespace ? `${namespace}[${data.name}]` : data.name
+    }
 
     return (
       <div
@@ -47,8 +53,10 @@ class FieldRenderer extends React.Component {
           type={type}
           placeholder={data.placeholder}
           options={data.options}
+          accept={accept}
+          id={id}
           fullWidth
-          name={`${namespace}[${data.name}]`}
+          name={formatFieldName()}
           defaultValue={props.data[camelCasedName]}
           handler={handler}
           helperText={

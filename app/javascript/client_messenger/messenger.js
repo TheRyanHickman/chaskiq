@@ -3,6 +3,7 @@ import ReactDOM from "react-dom";
 //import styled from '@emotion/styled'
 import { ThemeProvider } from 'emotion-theming'
 
+import {uniqBy} from 'lodash'
 import actioncable from "actioncable"
 import axios from "axios"
 import UAParser from 'ua-parser-js'
@@ -21,7 +22,8 @@ import {
   CONVERSATION,
   INSERT_COMMMENT,
   START_CONVERSATION,
-  CONVERT
+  CONVERT,
+  APP_PACKAGE_HOOK
 } from './graphql/queries'
 import GraphqlClient from './graphql/client'
 
@@ -60,6 +62,7 @@ import StyledFrame from './styledFrame'
 
 import Home from './homePanel'
 import Article from './articles'
+import Banner from './Banner'
 
 import {Conversation, Conversations} from './conversation.js'
 import {RtcView} from '../src/components/rtc'
@@ -76,6 +79,8 @@ class Messenger extends Component {
     // set language from user auth lang props 
     i18n.changeLanguage(this.props.lang);
 
+    this.homeHeaderRef = React.createRef();
+
     this.state = {
       visible: true,
       enabled: null,
@@ -89,6 +94,7 @@ class Messenger extends Component {
       conversationsMeta: {},
       availableMessages: [],
       availableMessage: null,
+      banner:localStorage.getItem(`chaskiq-banner`) && JSON.parse(localStorage.getItem(`chaskiq-banner`)),
       display_mode: "home", // "conversation", "conversations",
       tours: [],
       open: false,
@@ -134,8 +140,8 @@ class Messenger extends Component {
     if(this.props.encryptedMode){
       this.defaultHeaders = { 
         app: this.props.app_id,
-        enc_data: this.props.encData || "",
-        session_id: this.props.session_id,
+        'enc-data': this.props.encData || "",
+        'session-id': this.props.session_id,
         lang: this.props.lang
       }
 
@@ -180,18 +186,17 @@ class Messenger extends Component {
         case "trigger":
           this.requestTrigger(data)
           break;
+        case "unload":
+          //this.unload()
         default:
           break;
       } 
     });
 
-    this.pling = new Audio(`${this.props.domain}/sounds/pling.mp3`)
+    this.pling = new Audio(`${this.props.domain}/sounds/BING-E5.wav`)
   }
 
   componentDidMount(){
-
-    //this.eventsSubscriber()
-
     this.visibility()
     
     this.ping(()=> {
@@ -201,6 +206,11 @@ class Messenger extends Component {
       //this.getMessage()
       //this.getTours()
       this.locationChangeListener()
+    })
+
+    document.addEventListener("turbolinks:before-visit", ()=>{
+      console.log('unload triggered')
+      this.unload()
     })
 
     this.updateDimensions()
@@ -219,6 +229,10 @@ class Messenger extends Component {
     window.opener && window.opener.postMessage(
       {type: "ENABLE_MANAGER_TOUR"}, "*"
     );
+  }
+
+  unload() {
+    App.cable && App.cable.subscriptions.consumer.disconnect();
   }
 
   componentDidUpdate(prevProps, prevState){
@@ -339,6 +353,9 @@ class Messenger extends Component {
         connected: ()=> {
           //console.log("connected to events")
           this.registerVisit()
+
+          if(!this.state.banner)
+            App.events.perform('get_banners_for_user')
           //this.processTriggers()
         },
         disconnected: ()=> {
@@ -356,12 +373,15 @@ class Messenger extends Component {
             case "tours:receive":
               this.receiveTours([data.data])
               break
+            case "banners:receive":
+              this.receiveBanners(data.data)
+              break
             case "triggers:receive":
               this.receiveTrigger(data.data)
               break
             case "conversations:conversation_part":
               const newMessage = toCamelCase(data.data)
-              this.receiveMessage(newMessage)
+              setTimeout(()=> this.receiveMessage(newMessage), 100)
               break
             case "conversations:typing":
               this.handleTypingNotification(toCamelCase(data.data))
@@ -376,8 +396,6 @@ class Messenger extends Component {
             default:
               return 
           }
-
-
           //console.log(`received event`, data)
         },
         notify: ()=>{
@@ -410,6 +428,10 @@ class Messenger extends Component {
   }
 
   receiveMessage = (newMessage)=>{
+    this.processMessage(newMessage)
+  }
+
+  processMessage = (newMessage)=>{
 
     this.setState({
       agent_typing: false
@@ -419,41 +441,44 @@ class Messenger extends Component {
     if(!this.state.open && !this.state.inline_conversation){
       
       this.clearConversation(()=>{
-        
-        if(this.state.appData.inlineNewConversations){
+        if (this.state.appData.inlineNewConversations){
 
           this.setConversation(newMessage.conversationKey, ()=>{
             this.setState({
               inline_conversation: newMessage.conversationKey
-            }, ()=> setTimeout(this.scrollToLastItem, 200) )
+            }, ()=> {
+              setTimeout(this.scrollToLastItem, 200)
+            })
           })
 
-        }else{
-
+        } else {
           this.setConversation(newMessage.conversationKey, ()=>{
             this.setState({
               display_mode: "conversation",
               open: true,
-            }, ()=> setTimeout(this.scrollToLastItem, 200) )
+            }, ()=> {
+              setTimeout(this.scrollToLastItem, 200)
+            })
           })
-
         }
-
       })
-      
       return
     }
 
     // return if message does not correspond to conversation
-    if(this.state.conversation.key != newMessage.conversationKey) return
+    if(this.state.conversation.key != newMessage.conversationKey) {
+      return
+    }
 
     // return on existings messages, fixes in part the issue on re rendering app package blocks
     // if(this.state.conversation.messages && this.state.conversation.messages.find((o)=> o.id === newMessage.id )) return
-
-    // append or update
-    if ( this.state.conversation.messages.collection.find( (o)=> o.id === newMessage.id ) ){
-      const new_collection = this.state.conversation.messages.collection.map((o)=>{
-          if (o.id === newMessage.id ){
+    
+    // update or append
+    if ( this.state.conversation.messages.collection.find( (o)=> o.key === newMessage.key ) ){
+      
+      const new_collection = this.state.conversation.messages.collection.map(
+        (o)=>{
+          if (o.key === newMessage.key ){
             return newMessage
           } else {
             return o
@@ -463,7 +488,7 @@ class Messenger extends Component {
       this.setState({
         conversation: Object.assign(this.state.conversation, {
           messages: { 
-            collection: new_collection,
+            collection: uniqBy(new_collection, 'key'),
             meta: this.state.conversation.messages.meta
            }
         })
@@ -471,20 +496,24 @@ class Messenger extends Component {
 
     } else {
 
+      //console.log("appending!")
       this.setState({
         conversation: Object.assign(this.state.conversation, {
           messages: { 
-            collection: [newMessage].concat(this.state.conversation.messages.collection) ,
+            collection: uniqBy([newMessage].concat(
+              this.state.conversation.messages.collection
+            ), 'key') ,
             meta: this.state.conversation.messages.meta
           }
         })
-      }, this.scrollToLastItem)
+      }, ()=> {
+        this.scrollToLastItem()
+      })
       
       if (newMessage.appUser.kind === "agent") {
         this.playSound()
       }
     }
-
   }
 
   precenseSubscriber =()=>{
@@ -555,7 +584,8 @@ class Messenger extends Component {
 
     const message = {
       html: comment.html_content,
-      serialized: comment.serialized_content
+      serialized: comment.serialized_content,
+      text: comment.text_content
     }
 
     // force an Assignment from client
@@ -568,6 +598,13 @@ class Messenger extends Component {
       message: message
     }, {
       success: (data)=>{
+        if(data.insertComment.message){
+          this.receiveMessage(
+            {...data.insertComment.message, 
+              conversationKey: this.state.conversation.key
+          })
+        }
+
         cb(data)
       },
       error: ()=>{
@@ -581,6 +618,7 @@ class Messenger extends Component {
     const message = {
       html: comment.html_content,
       serialized: comment.serialized_content,
+      text: comment.text_content,
       volatile: this.state.conversation,
     }
 
@@ -612,8 +650,7 @@ class Messenger extends Component {
     })
    }
 
-  
-   handleTriggerRequest = (trigger)=>{
+  handleTriggerRequest = (trigger)=>{
     if (this.state.appData.tasksSettings){
       setTimeout(()=>{
         this.requestTrigger(trigger)
@@ -857,50 +894,6 @@ class Messenger extends Component {
     App.events && App.events.perform(name, data)
   }
 
-  /*sendTrigger = ()=>{
-    console.log("send trigger")
-    this.axiosInstance.get(`/api/v1/apps/${this.props.app_id}/triggers.json`)
-    .then((response) => {
-      console.log("trigger sent!")
-      //this.setState({
-      //  messages: this.state.messages.concat(response.data.message)
-      //})
-
-      //if (cb)
-      //  cb()
-    })
-    .catch((error) => {
-      console.log(error);
-    });
-  }
-
-  processTriggers = ()=>{
-    this.state.appData.triggers.map((o)=>{
-      this.processTrigger(o)
-    })
-  }
-
-  processTrigger = (trigger)=>{
-    if(localStorage.getItem("chaskiq:trigger-"+trigger.id)){
-      console.log("skip trigger , stored")
-      return
-    } 
-    
-    if(!this.complyRules(trigger))
-      return
-
-    this.sendTrigger()
-  }
-
-  complyRules = (trigger)=>{
-    const matches = trigger.rules.map((o)=>{
-      var pattern = new UrlPattern(o.pages_pattern)
-      return pattern.match(document.location.pathname);
-    })
-
-    return matches.indexOf(null) === -1
-  }*/
-
   // check url pattern before trigger tours
   receiveTours = (tours)=>{
     const filteredTours = tours.filter((o)=>{
@@ -910,6 +903,18 @@ class Messenger extends Component {
     })
 
     if(filteredTours.length > 0) this.setState({tours: filteredTours})
+  }
+
+  receiveBanners = (banner)=>{
+    localStorage.setItem(`chaskiq-banner`, JSON.stringify(banner));
+    this.setState({ banner: banner }, ()=>{
+      App.events && App.events.perform(
+        "track_open",
+        {
+          trackable_id: this.state.banner.id
+        } 
+      )
+    })
   }
 
   submitAppUserData = (data, next_step)=>{
@@ -965,16 +970,17 @@ class Messenger extends Component {
   displayAppBlockFrame = (message)=>{
     this.setState({
       display_mode: "appBlockAppPackage",
-      currentAppBlock: {
-        message: message
-      }
+      currentAppBlock: message,
     })
   }
 
+  // received from app package iframes
+  // TODO, send a getPackage hook instead, and call a submit action
+  // save trigger id
   handleAppPackageEvent = (ev)=>{
     App.events && App.events.perform('app_package_submit', {
-      conversation_id: this.state.conversation.key,
-      message_id: this.state.currentAppBlock.message.id,
+      conversation_key: this.state.conversation.key,
+      message_key: this.state.currentAppBlock.message.key,
       data: ev.data
     })
 
@@ -1026,6 +1032,51 @@ class Messenger extends Component {
   toggleAudio= ()=> this.setState({rtcAudio: !this.state.rtcAudio})
 
   toggleVideo= ()=> this.setState({rtcVideo: !this.state.rtcVideo})
+
+  getPackage = (params, cb) => {
+    const newParams = {
+      ...params,
+      appKey: this.props.app_id
+    }
+    this.graphqlClient.send(
+      APP_PACKAGE_HOOK, 
+      newParams,
+      {
+        success: (data) => {
+          cb && cb(data)
+        },
+        error: (data) => {
+          cb && cb(data)
+        },
+        fatal: (data) => {
+          cb && cb(data)
+        }
+      })
+  }
+
+  closeBanner = ()=>{
+    if(!this.state.banner) return
+
+    App.events && App.events.perform(
+      "track_close",
+      {
+        trackable_id: this.state.banner.id
+      } 
+    )
+    this.setState({banner: null})
+    localStorage.removeItem("chaskiq-banner")
+  }
+
+  bannerActionClick = (url)=>{
+    window.open(url,'_blank');
+
+    App.events && App.events.perform(
+      "track_click",
+      {
+        trackable_id: this.state.banner.id
+      } 
+    )
+  }
 
   render() {
     const palette = this.themePalette()
@@ -1124,7 +1175,9 @@ class Messenger extends Component {
                                 }
 
                                 { this.state.display_mode === "home" &&
-                                  <HeaderTitle style={{
+                                  <HeaderTitle 
+                                  ref={ this.homeHeaderRef }
+                                  style={{
                                     padding: '2em',
                                     opacity: this.state.header.opacity,
                                     transform: `translateY(${this.state.header.translateY}px)`
@@ -1161,6 +1214,7 @@ class Messenger extends Component {
                                 this.state.display_mode === "home" &&
                                 <React.Fragment> 
                                   <Home 
+                                    homeHeaderRef={this.homeHeaderRef}
                                     newMessages={this.state.new_messages}
                                     graphqlClient={this.graphqlClient}
                                     displayNewConversation={this.displayNewConversation}
@@ -1170,9 +1224,12 @@ class Messenger extends Component {
                                     displayArticle={this.displayArticle}
                                     appData={this.state.appData}
                                     agents={this.state.agents}
+                                    displayAppBlockFrame={this.displayAppBlockFrame}
                                     displayConversation={this.displayConversation}
                                     conversations={this.state.conversations}
+                                    conversationsMeta={this.state.conversationsMeta}
                                     getConversations={this.getConversations}
+                                    getPackage={this.getPackage}
                                     {...this.props}
                                     t={this.props.t}
                                   />
@@ -1220,6 +1277,7 @@ class Messenger extends Component {
                                     updateHeader={this.updateHeader}
                                     transition={this.state.transition}
                                     pushEvent={this.pushEvent}
+                                    getPackage={this.getPackage}
                                     displayAppBlockFrame={this.displayAppBlockFrame}
                                     t={this.props.t}
                                   /> 
@@ -1383,9 +1441,9 @@ class Messenger extends Component {
                           <MessageIcon 
                             palette={palette} 
                             style={{ 
-                              height: '43px',
-                              width: '36px',
-                              margin: '8px 0px'
+                              height: '28px',
+                              width: '28px',
+                              margin: '13px'
                             }}
                           /> : 
                           <CloseIcon 
@@ -1393,7 +1451,7 @@ class Messenger extends Component {
                             style={{
                               height: '26px',
                               width: '21px',
-                              margin: '11px 0px',
+                              margin: '13px 16px',
                             }}
                           />
                       }
@@ -1428,6 +1486,25 @@ class Messenger extends Component {
               }
 
             <div id="TourManager"></div>
+
+            { 
+              this.state.banner && <Banner 
+                {...this.state.banner.banner_data}
+                onAction={ (url)=> {
+                  this.bannerActionClick(url)
+                }}
+                onClose={ ()=>{ 
+                  this.closeBanner()
+                }}
+                id={this.state.banner.id}
+                serialized_content={
+                  <DraftRenderer
+                    domain={this.props.domain}
+                    raw={ JSON.parse(this.state.banner.serialized_content) }
+                  />
+                }
+              />
+            }
           
         </ThemeProvider>
     );
@@ -1501,25 +1578,41 @@ class AppBlockPackageFrame extends Component {
   }
 
   render(){
-    //console.log("PACK", this.props)
-    const blocks = toCamelCase(this.props.appBlock.message.message.blocks)
-    const conversation = this.props.appBlock.message.conversation
-    const mainParticipant = conversation.mainParticipant
-    const url = `${this.props.domain}/package_iframe/${blocks.appPackage.toLowerCase()}`
-    let src = new URL(url)
-    //Object.keys(blocks.values, (k)=>{
-    //  src.searchParams.set(k, encodeURIComponent( blocks.values[k] ))
-    //})
-    //'https://admin.typeform.com/to/cVa5IG');
+    const {data} = this.props.appBlock
+    const {message} = this.props.appBlock.message
+    const {conversation} = this.props
 
-    src.searchParams.set("url", blocks.values.src )
-    src.searchParams.set("conversation_key", this.props.appBlock.message.conversation.key )
-    src.searchParams.set("name", mainParticipant.displayName )
-    src.searchParams.set("message_id", this.props.appBlock.message.id )
-    src.searchParams.set("data", JSON.stringify(this.props.appBlock.message.message.data) )
+    let src = null
+    let url = null
+    
+    let params = {}
+
+    if(conversation.key && message){
+      /*params = {
+        data: data,
+        message: message,
+        message_id: this.props.appBlock.data,
+        conversation_id: conversation.key
+      }*/
+
+      params = JSON.stringify({data: data})
+
+      const blocks = toCamelCase(message.blocks)
+      let url = `${this.props.domain}/package_iframe/${blocks.appPackage.toLowerCase()}`
+      src = new URL(url)
+
+    } else {
+      params = JSON.stringify({data: data})
+      let url = `${this.props.domain}/package_iframe/${data.id}`
+      src = new URL(url)
+    }
+  
+    src.searchParams.set("data", params)
 
     return <div>
-              <iframe src={src.href} 
+              <iframe
+                id="package-frame"
+                src={src.href} 
                 style={{
                   width: '100%',
                   height: 'calc(100vh - 75px)',
@@ -1576,16 +1669,6 @@ class MessageFrame extends Component {
     }
   }
 
-  handleClose = (message)=>{
-    App.events && App.events.perform(
-      "track_close",
-      {
-        trackable_id: message.id, 
-        trackable_type: "UserAutoMessage"
-      } 
-    )
-  }
-
   handleMinus = (ev) => {
     ev.preventDefault()
     this.toggleMinimize(ev)
@@ -1596,6 +1679,14 @@ class MessageFrame extends Component {
     this.handleClose(ev)
   }
 
+  handleClose = (message)=>{
+    App.events && App.events.perform(
+      "track_close",
+      {
+        trackable_id: message.id
+      } 
+    )
+  }
 
   render(){
     return <UserAutoMessageStyledFrame 
@@ -1606,7 +1697,6 @@ class MessageFrame extends Component {
 
               {
                 this.props.availableMessages.map((o, i) => {
-                  
                   return <UserAutoMessage 
                           open={true} 
                           key={`user-auto-message-${o.id}`}>
@@ -1634,8 +1724,7 @@ class MessageContainer extends Component {
   componentDidMount(){
     App.events && App.events.perform("track_open", 
       {
-        trackable_id: this.props.availableMessage.id, 
-        trackable_type: "UserAutoMessage"  
+        trackable_id: this.props.availableMessage.id  
       }   
     )
   }
@@ -1676,9 +1765,13 @@ export default class ChaskiqMessenger {
 
   render(){
     //document.addEventListener('DOMContentLoaded', () => {
-      var g = document.createElement('div');
-      g.setAttribute("id", "ChaskiqMessengerRoot");
-      document.body.appendChild(g);
+
+      var g = document.getElementById(this.props.wrapperId) 
+      if(!g){
+        var g = document.createElement('div');
+        g.setAttribute("id", this.props.wrapperId);
+        document.body.appendChild(g);
+      }
 
       ReactDOM.render(
         <TranslatedMessenger {...this.props} i18n={i18n} />,

@@ -28,9 +28,9 @@ export default class ChaskiqMessengerEncrypted {
 
     this.defaultHeaders = {
       app: this.props.app_id,
-      enc_data: this.props.data || '',
-      user_data: JSON.stringify(data),
-      session_id: this.getSession(),
+      'enc-data': this.props.data || '',
+      'user-data': JSON.stringify(data),
+      'session-id': this.getSession(),
       lang: currentLang
     }
 
@@ -58,7 +58,8 @@ export default class ChaskiqMessengerEncrypted {
             encryptedMode: true,
             domain: this.props.domain,
             ws: this.props.ws,
-            lang: user.lang
+            lang: user.lang,
+            wrapperId: this.props.wrapperId || 'ChaskiqMessengerRoot'
           })
         )
 
@@ -68,6 +69,10 @@ export default class ChaskiqMessengerEncrypted {
         debugger
       }
     })
+
+    this.unload = ()=> {
+      this.sendCommand('unload', {})
+    }
 
     this.sendCommand = (action, data = {}) => {
       const event = new CustomEvent('chaskiq_events',

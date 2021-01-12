@@ -45,31 +45,37 @@ class ApiController < ActionController::API
   end
 
   def get_user_data
-    @user_data = if @app.encryption_enabled?
-                   authorize_by_encrypted_params
-                 else
-                   get_user_from_unencrypted
-                 end
+    @user_data ||= if @app.encryption_enabled?
+                     authorize_by_encrypted_params
+                   else
+                     get_user_from_unencrypted
+                   end
   end
 
   def set_locale
     http_locale = request.headers['HTTP_LANG']
     http_splitted_locale = http_locale ? http_locale.to_s.split('-').first.to_sym : nil
     user_locale = begin
-                    @user_data[:properties].try(:[], :lang)
-                  rescue StandardError
-                    nil
-                  end
+      @user_data[:properties].try(:[], :lang)
+    rescue StandardError
+      nil
+    end
 
-    locale = lang_available?(user_locale) ? user_locale :
-    lang_available?(http_locale) ? http_locale :
-    lang_available?(http_splitted_locale) ? http_splitted_locale : nil
+    locale = if lang_available?(user_locale)
+               user_locale
+             else
+               if lang_available?(http_locale)
+                 http_locale
+               else
+                 lang_available?(http_splitted_locale) ? http_splitted_locale : nil
+               end
+             end
 
     I18n.locale = begin
-                    locale
-                  rescue StandardError
-                    I18n.locale
-                  end
+      locale
+    rescue StandardError
+      I18n.locale
+    end
   end
 
   def add_vistor
@@ -80,7 +86,7 @@ class ApiController < ActionController::API
 
   def get_app_user
     valid_origin?
-    get_user_by_email || get_user_by_session
+    @app_user ||= get_user_by_email || get_user_by_session
   end
 
   def get_user_by_email
@@ -91,7 +97,7 @@ class ApiController < ActionController::API
 
   def valid_origin?
     OriginValidator.new(
-      app: @app.domain_url, 
+      app: @app.domain_url,
       host: request.env['HTTP_ORIGIN']
     ).is_valid?
   end
@@ -99,7 +105,6 @@ class ApiController < ActionController::API
   def get_user_by_session
     session_id = request.headers['HTTP_SESSION_ID']
     return nil if session_id.blank?
-
     @app.app_users.where(type: %w[Visitor Lead]).find_by(session_id: session_id)
   end
 
@@ -141,8 +146,6 @@ class ApiController < ActionController::API
       render text: '', content_type: 'text/plain'
     end
   end
-
-  private
 
   def lang_available?(lang)
     return if lang.blank?

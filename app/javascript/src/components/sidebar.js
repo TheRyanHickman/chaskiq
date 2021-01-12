@@ -32,7 +32,8 @@ import {
   MessageIcon,
   EmailIcon,
   ApiIcon,
-  CardIcon
+  CardIcon,
+  PictureInPicture
 } from '../components/icons'
 
 import SidebarAgents from '../components/conversations/SidebarAgents'
@@ -46,7 +47,6 @@ import {
 } from '../graphql/mutations'
 import graphql from '../graphql/client'
 import { getCurrentUser } from '../actions/current_user'
-
 
 function mapStateToProps (state) {
   const {
@@ -197,6 +197,13 @@ function Sidebar ({
           active: isActivePage('user_auto_messages')
         },
         {
+          id: 'banners',
+          label: I18n.t('navigator.childs.banners'),
+          icon: <PictureInPicture />,
+          url: `${appid}/messages/banners`,
+          active: isActivePage('banners')
+        },
+        {
           id: 'tours',
           label: I18n.t('navigator.childs.guided_tours'),
           icon: <TourIcon />,
@@ -266,6 +273,7 @@ function Sidebar ({
       ]
     },
 
+
     {
       id: 'Settings',
       label: I18n.t('navigator.settings'),
@@ -279,6 +287,15 @@ function Sidebar ({
           url: `/apps/${app.key}/settings`,
           active: isActivePage('app_settings')
         },
+
+        {
+          id: 'Messenger',
+          label: I18n.t('navigator.childs.messenger_settings'),
+          icon: <MessageIcon />,
+          url: `/apps/${app.key}/messenger`,
+          active: isActivePage('messenger')
+        },
+
         {
           id: 'Team',
           label: I18n.t('navigator.childs.team'),
@@ -335,7 +352,7 @@ function Sidebar ({
           >
             <div className="flex items-center flex-shrink-0 px-4
               text-lg leading-6 font-bold text-gray-900">
-              <h3 className="font-bold">{label}</h3>
+              <h3 className="font-bold w-full">{label}</h3>
             </div>
             <nav className="mt-5 flex-1 px-4">
               {children.filter((o)=> !o.hidden ).map(

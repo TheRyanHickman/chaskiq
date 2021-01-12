@@ -1,8 +1,8 @@
 // src/components/button.js
 import React from 'react'
-import tw from 'tailwind.macro'
+//import tw from 'tailwind.macro'
 import styled from '@emotion/styled'
-
+import tw from 'twin.macro'
 // https://nystudio107.com/blog/using-tailwind-css-with-gatsby-react-emotion-styled-components
 
 const BaseButton = styled.button`
@@ -17,8 +17,34 @@ const BaseButton = styled.button`
         hover:bg-green-500 
         focus:outline-none 
         focus:border-green-700 
-        focus:shadow-outline-green
+        focus:shadow-outline
         `
+      case 'flat':
+        return tw`
+        inline-flex 
+        items-center 
+        border 
+        border-transparent 
+        text-xs 
+        font-medium 
+        rounded 
+        text-indigo-700 
+        bg-indigo-100 
+        hover:bg-indigo-200 
+        focus:outline-none 
+        `
+      case 'flat-dark':
+        return tw`
+          border 
+          border-transparent 
+          rounded 
+          text-gray-100 
+          bg-gray-900 
+          hover:bg-gray-800 
+          focus:outline-none 
+          focus:border-gray-700 
+          active:bg-gray-800 
+          `
       case 'main':
         return tw`outline-none 
         inline-flex 
@@ -26,9 +52,14 @@ const BaseButton = styled.button`
         border 
         border-transparent 
         rounded-md 
-        text-white bg-indigo-600 hover:bg-indigo-500 
-        focus:outline-none focus:shadow-outline-indigo 
-        focus:border-indigo-700 active:bg-indigo-700`
+        text-white bg-indigo-600 
+        hover:bg-indigo-500 
+        focus:outline-none 
+        focus:shadow-outline 
+        focus:border-indigo-700 
+        active:bg-indigo-700`
+      case 'link':
+        return tw`flex text-indigo-700 hover:text-indigo-900`
       case 'clean':
         return ''
       case 'outlined':
@@ -36,45 +67,60 @@ const BaseButton = styled.button`
         inline-flex 
         items-center 
         border
-        border-color-gray-500
-        rounded-md text-gray-500
+        border-gray-500
+        rounded-md 
+        text-gray-500
         focus:outline-none 
-        border-1
-        focus:shadow-outline-indigo 
+        focus:shadow-outline 
         focus:border-indigo-700 
-        active:bg-indigo-700`
+        active:bg-indigo-700
+        hover:shadow-md
+        hover:bg-gray-100
+        `
       case 'icon':
-        return tw`outline-none 
+        return tw`
+        outline-none 
         rounded-full 
-        p-1 bg-gray-10 
-        hover:bg-gray-200`
+        p-1 
+        bg-transparent
+        hover:text-gray-400`
       case 'danger':
         return tw`outline-none 
-        rounded-md 
+        rounded 
         bg-red-400 
         text-white
         hover:bg-red-500 
         focus:outline-none 
         focus:border-red-700 
-        focus:shadow-outline-red
+        focus:shadow-outline
         `
       default:
         return tw`
-        outline-none 
-        inline-flex 
-        items-center 
+        flex 
+        flex-wrap 
+        items-center
+        rounded
         border 
-        border-transparent
-        rounded-md 
-        text-white 
-        bg-indigo-600 
-        hover:bg-indigo-500 
+        border-transparent 
+        text-indigo-700 
+        bg-indigo-100 
+        hover:bg-indigo-200
         focus:outline-none 
-        focus:border-indigo-700 
-        focus:shadow-outline-indigo 
-        active:bg-indigo-700`
+        focus:border-indigo-300 
+        active:bg-indigo-200
+        `
     }
   }};
+
+  ${(props) => {
+    switch (props.border) {
+      case true:
+        return tw`border`
+      default:
+        return ''
+    }
+    }
+  }
 `
 
 const SizeButton = styled(BaseButton)`
@@ -86,13 +132,12 @@ const SizeButton = styled(BaseButton)`
         text-xs 
         font-medium 
       `
+      case 'sm':
       case 'small':
         return tw`
-        px-2 py-1
-        text-sm 
-        font-medium 
-        leading-7
+        px-2.5 py-1.5 text-xs leading-4
       `
+      case 'md':
       case 'medium':
         return tw`px-4 py-2 
         text-sm 
@@ -100,6 +145,7 @@ const SizeButton = styled(BaseButton)`
         font-medium 
         uppercase 
         `
+      case 'lg':
       case 'large':
         return tw`px-8 py-4 
         text-xl 

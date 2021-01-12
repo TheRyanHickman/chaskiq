@@ -26,6 +26,7 @@ Rails.application.routes.draw do
   mount Sidekiq::Web => '/sidekiq'
 
   devise_for :agents, controllers: {
+    registrations: 'agents/registrations',
     invitations: 'agents/invitations',
     sessions: 'agents/sessions',
     omniauth_callbacks: 'agents/omniauth_callbacks'
@@ -35,6 +36,7 @@ Rails.application.routes.draw do
 
   resource :oembed, controller: 'oembed', only: :show
   get '/package_iframe/:package' => 'application#package_iframe'
+  post '/package_iframe_internal/:package' => 'application#package_iframe_internal'
   post '/dummy_webhook' => 'application#dummy_webhook'
 
   constraints(SubdomainOrDomain) do

@@ -2,15 +2,15 @@
 # of editing this file, please use the migrations feature of Active Record to
 # incrementally modify your database, and then regenerate this schema definition.
 #
-# This file is the source Rails uses to define your schema when running `rails
-# db:schema:load`. When creating a new database, `rails db:schema:load` tends to
+# This file is the source Rails uses to define your schema when running `bin/rails
+# db:schema:load`. When creating a new database, `bin/rails db:schema:load` tends to
 # be faster and is potentially less error prone than running all of your
 # migrations from scratch. Old migrations may fail to apply correctly if those
 # migrations use external dependencies or application code.
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2020_07_30_031419) do
+ActiveRecord::Schema.define(version: 2020_12_10_184518) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -33,7 +33,14 @@ ActiveRecord::Schema.define(version: 2020_07_30_031419) do
     t.bigint "byte_size", null: false
     t.string "checksum", null: false
     t.datetime "created_at", null: false
+    t.string "service_name", null: false
     t.index ["key"], name: "index_active_storage_blobs_on_key", unique: true
+  end
+
+  create_table "active_storage_variant_records", force: :cascade do |t|
+    t.bigint "blob_id", null: false
+    t.string "variation_digest", null: false
+    t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
   end
 
   create_table "agents", force: :cascade do |t|
@@ -100,6 +107,9 @@ ActiveRecord::Schema.define(version: 2020_07_30_031419) do
     t.string "url"
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
+    t.bigint "agent_id"
+    t.boolean "published", default: false
+    t.index ["agent_id"], name: "index_app_packages_on_agent_id"
   end
 
   create_table "app_translations", force: :cascade do |t|
@@ -148,7 +158,9 @@ ActiveRecord::Schema.define(version: 2020_07_30_031419) do
     t.datetime "last_contacted"
     t.datetime "last_heard_from"
     t.index ["app_id"], name: "index_app_users_on_app_id"
+    t.index ["email"], name: "index_app_users_on_email"
     t.index ["key"], name: "index_app_users_on_key"
+    t.index ["session_id"], name: "index_app_users_on_session_id"
     t.index ["type"], name: "index_app_users_on_type"
   end
 
@@ -495,6 +507,12 @@ ActiveRecord::Schema.define(version: 2020_07_30_031419) do
     t.index ["provider"], name: "index_external_profiles_on_provider"
   end
 
+  create_table "jwt_blacklist", force: :cascade do |t|
+    t.string "jti", null: false
+    t.datetime "exp", null: false
+    t.index ["jti"], name: "index_jwt_blacklist_on_jti"
+  end
+
   create_table "metrics", force: :cascade do |t|
     t.bigint "campaign_id"
     t.string "trackable_type", null: false
@@ -674,8 +692,10 @@ ActiveRecord::Schema.define(version: 2020_07_30_031419) do
   end
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "app_package_integrations", "app_packages"
   add_foreign_key "app_package_integrations", "apps"
+  add_foreign_key "app_packages", "agents"
   add_foreign_key "app_users", "apps"
   add_foreign_key "article_collections", "apps"
   add_foreign_key "article_settings", "apps"

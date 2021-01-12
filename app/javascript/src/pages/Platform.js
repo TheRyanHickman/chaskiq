@@ -2,7 +2,7 @@ import React from 'react'
 
 import PageHeader from '../components/PageHeader'
 import Content from '../components/Content'
-
+import ContactManager from '../components/ContactManager'
 import { withRouter } from 'react-router-dom'
 import { connect } from 'react-redux'
 import { setCurrentPage, setCurrentSection } from '../actions/navigation'
@@ -22,7 +22,7 @@ import { setApp } from '../actions/app'
 
 import AppContent from '../components/segmentManager/container'
 
-import tw from 'tailwind.macro'
+import tw from 'twin.macro'
 
 const PageContainer = tw.div`
   bg-gray-200 text-xl w-1/2
@@ -155,7 +155,12 @@ function Platform ({
 
   return (
     <Content>
-      <PageHeader title={segment && segment.name} />
+      <PageHeader 
+        title={segment && segment.name}
+        actions={
+          <ContactManager app={app}/>
+        }
+      />
 
       <div className="flex flex-col">
         {/* <button type="button" className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs leading-4 font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-50 focus:outline-none focus:border-indigo-300 focus:shadow-outline-indigo active:bg-indigo-200 transition ease-in-out duration-150">

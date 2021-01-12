@@ -18,7 +18,7 @@ class MessengerEventsChannel < ApplicationCable::Channel
     options.delete('action')
 
     VisitCollector.new(user: @app_user)
-    .update_browser_data(options)
+                  .update_browser_data(options)
 
     AppUserEventJob.perform_now(
       app_key: @app.key,
@@ -26,12 +26,30 @@ class MessengerEventsChannel < ApplicationCable::Channel
     )
   end
 
+  #### experimental
+  def get_banners_for_user()
+    Banner.broadcast_banner_to_user(@app_user)
+  end
+
+  def get_tours_for_user()
+    Tour.broadcast_tour_to_user(@app_user)
+  end
+
+  def get_tasks_for_user()
+    BotTask.broadcast_task_to_user(@app_user)
+  end
+
+  def get_messages_for_user()
+    UserAutoMessage.broadcast_message_to_user(@app_user)
+  end
+  #####
+
   def rtc_events(data)
     @app = App.find_by(key: params[:app])
     @conversation = @app.conversations.find_by(key: data['conversation_id'])
     key = "messenger_events:#{@app.key}-#{@app_user.session_id}"
     key2 = "events:#{@app.key}"
-    if(data['event_type'] == 'JOIN_ROOM')
+    if data['event_type'] == 'JOIN_ROOM'
       ActionCable.server.broadcast key, {
         type: 'rtc_events',
         app: @app.key,
@@ -44,32 +62,64 @@ class MessengerEventsChannel < ApplicationCable::Channel
 
   def receive_conversation_part(data)
     get_session_data
-    @conversation = @app.conversations.find_by(key: data['conversation_id'])
-    message = @conversation.messages.find(data['message_id'])
+    @conversation = @app.conversations.find_by(key: data['conversation_key'])
+    message = @conversation.messages.find_by(key: data['message_key'])
+
+    # if the message was read skip processing
+    # this will avoid message duplication
+    return if message.read?
+
     message.read! if message.authorable != @app_user
 
     if message.from_bot?
       process_next_step(message)
 
-      if data['submit'].present?
+      #### TODO: to be deprecated in favor of app packages
+      if data['submit'].present? && message.message&.blocks&.dig('type') == 'data_retrieval'
         opts = @app.searcheable_fields_list
         @app_user.update(data['submit'].slice(*opts)) # some condition from settings here?
         data_submit(data['submit'], message)
       end
+      ####
 
       data_submit(data['reply'], message) if data['reply'].present?
     end
   end
 
+  # from iframes
   def app_package_submit(data)
     get_session_data
-    @conversation = @app.conversations.find_by(key: data['conversation_id'])
-    message = @conversation.messages.find(data['message_id'])
-    data_submit(data['submit'], message)
+    @conversation = @app.conversations.find_by(key: data['conversation_key'])
+    message = @conversation.messages.find_by(key: data['message_key'])
+
+    app_package = @app.app_package_integrations
+                      .joins(:app_package)
+                      .find_by(
+                        "app_packages.name": data['data']['type'].capitalize
+                      )
+
+    response = app_package&.call_hook(
+      kind: 'submit',
+      ctx: {
+        lang: I18n.locale,
+        app: @app,
+        location: 'messenger',
+        current_user: @app_user,
+        values: data['data']
+      }
+    )
+
+    # UPDATE message blocks here!
+    new_blocks = message.message.blocks.merge(
+      { 'schema' => response[:definitions] }
+    )
+    m = message.message
+
+    m.blocks = new_blocks
+    m.save_replied(data['submit'])
   end
 
   def process_next_step(message)
-
     return if message.trigger_locked.value.present?
 
     message.trigger_locked.value = 1
@@ -83,11 +133,21 @@ class MessengerEventsChannel < ApplicationCable::Channel
       app_user: @app_user
     )
 
-    next_index = path['steps'].index do |o|
-      o['step_uid'].to_s == message.step_id
-    end + 1
-
-    next_step = path['steps'][next_index]
+    # for factory triggers this is needed, as they are dynamic
+    if !path
+      paths = trigger.paths.map do |o|
+        o[:steps].find do |s|
+          s[:step_uid].to_s == message&.message&.blocks&.dig('next_step_uuid')
+        end
+      end
+      next_step = paths.find { |o| o }.with_indifferent_access
+    else
+      # normal flow , get next step from next index on the static trigger
+      next_index = path['steps'].index do |o|
+        o['step_uid'].to_s == message.step_id
+      end + 1
+      next_step = path['steps'][next_index]
+    end
 
     if next_step.blank?
       handle_follow_actions(path)
@@ -147,17 +207,15 @@ class MessengerEventsChannel < ApplicationCable::Channel
 
   def data_submit(data, message)
     get_session_data
-    if message.message.respond_to?(:save_replied)
-      message.message.save_replied(data)
-    end
+    message.message.save_replied(data) if message.message.respond_to?(:save_replied)
   end
 
   def trigger_step(data)
     get_session_data
-    
-    @conversation = @app.conversations.find_by(key: data['conversation_id'])
-    
-    message = @conversation.messages.find(data['message_id'])
+
+    @conversation = @app.conversations.find_by(key: data['conversation_key'])
+
+    message = @conversation.messages.find_by(key: data['message_key'])
 
     trigger, path = ActionTriggerFactory.find_task(data: data, app: @app, app_user: @app_user)
 
@@ -183,17 +241,19 @@ class MessengerEventsChannel < ApplicationCable::Channel
     if message.from_bot?
 
       if data['reply'].present?
-        data_submit(data['reply'], message) 
+        data_submit(data['reply'], message)
 
-        trigger.register_metric(
-          @app_user, 
-          data: data['reply'], 
-          options: {
-            message_key: message.key,
-            conversation_key: @conversation.key
-          }
-        ) if trigger.respond_to?(:register_metric)
-        
+        if trigger.respond_to?(:register_metric)
+          trigger.register_metric(
+            @app_user,
+            data: data['reply'],
+            options: {
+              message_key: message.key,
+              conversation_key: @conversation.key
+            }
+          )
+        end
+
       end
     end
 
@@ -205,9 +265,6 @@ class MessengerEventsChannel < ApplicationCable::Channel
         controls: next_step['controls']
       )
     end
-
-
-
   end
 
   def request_trigger(data)
@@ -270,16 +327,14 @@ class MessengerEventsChannel < ApplicationCable::Channel
   private
 
   def get_session_data
-    
     @app = App.find_by(key: params[:app])
 
     OriginValidator.new(
-      app: @app.domain_url, 
+      app: @app.domain_url,
       host: connection.env['HTTP_ORIGIN']
     ).is_valid?
 
     get_user_data
     find_user
   end
-
 end

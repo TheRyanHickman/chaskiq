@@ -2,6 +2,7 @@ import React from 'react'
 import Frame, { FrameContextConsumer } from 'react-frame-component'
 import createCache from '@emotion/cache'
 import { CacheProvider } from '@emotion/core'
+import baseStyles from './styles/reset'
 
 class CssInjector extends React.Component {
   constructor(props) {
@@ -39,6 +40,8 @@ const initialFrameContent = `<!DOCTYPE html>
                                       margin:0px; 
                                       font-family: 'Inter', sans-serif; 
                                     }
+
+                                    ${baseStyles}
                                   </style>
                                 </head>
                                 <body>
@@ -47,13 +50,14 @@ const initialFrameContent = `<!DOCTYPE html>
                               </html>`
 const mountTarget='#mountHere'
 
-const StyledFrame = ({ className, style, children, id }) => (
+const StyledFrame = ({ className, style, children, id, ...props }) => (
 
-  <Frame 
+  <Frame
     initialContent={initialFrameContent}
-    mountTarget={mountTarget} 
-    className={className} 
-    style={style || {} } 
+    mountTarget={mountTarget}
+    className={className}
+    style={style || {} }
+    {...props}
     id={id}>
     <FrameContextConsumer>
       {

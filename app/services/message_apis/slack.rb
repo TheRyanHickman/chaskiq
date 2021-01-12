@@ -378,7 +378,7 @@ module MessageApis
 
       serialized_blocks = serialize_content(event)
       
-      text = event["text"]
+      text = replace_emojis(event["text"])
 
       return if conversation.blank?
 
@@ -729,7 +729,7 @@ module MessageApis
       end
 
       { blocks: [
-          serialized_block(data['text']), 
+          serialized_block( replace_emojis(data['text']) ), 
           images
         ].flatten.compact
       }.to_json
@@ -780,12 +780,25 @@ module MessageApis
     def direct_upload(url, content_type=nil)
       authorize_bot!
       file = StringIO.new(get_data(url, {}).body)
-      blob = ActiveStorage::Blob.create_after_upload!(
+      blob = ActiveStorage::Blob.create_and_upload!(
         io: file,
         filename: File.basename(url),
-        content_type: content_type || "image/jpeg"
+        content_type: content_type || "image/jpeg",
+        identify: false
       )
       Rails.application.routes.url_helpers.rails_blob_path(blob)
+    end
+
+    def replace_emojis(text)
+      begin
+        text.gsub(/:(::|[^:\n])+:/) do |m| 
+          short_name = m.gsub(":", "")
+          EmojiData.from_short_name(short_name).render 
+        end
+      rescue => e
+        Bugsnag.notify(e)
+        text
+      end
     end
 
   end

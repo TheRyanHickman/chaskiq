@@ -67,6 +67,7 @@
         conversations: Conversaciones
         assignment_rules: Reglas de asignación
         mailing_campaigns: Campañas de correo
+        banners: Banners
         in_app_messages: En los mensajes de la aplicación
         guided_tours: Visitas guiadas
         for_leads: Para clientes potenciales
@@ -76,6 +77,7 @@
         collections: Colecciones
         article_settings: Configuraciones
         app_settings: Ajustes de Aplicación
+        messenger_settings: Ajustes del chat
         team: Equipo
         integrations: Integraciones
         webhooks: Webhooks
@@ -133,7 +135,14 @@
             confirm_msg: This quick reply will be delivered on user's current conversation.
             empty: no quick replies available
             choose_another: Choose another
-
+      sidebar:
+        show_profile: Ver perfil
+        latest_user_visible_comment_at: Último mensaje
+        created_at: Creado el
+        assignee: Asignado a
+        first_agent_reply: Primera respuesta de agente
+        location: Ubicación
+        browser: Navegador web
     assignment_rules:
       title: Reglas de asignación
       create_button: Crear regla
@@ -294,7 +303,7 @@
         availability: Disponibilidad
         email_requirement: Requisito de correo electrónico
         inbound_settings: Configuraciones entrantes
-        messenger_style: Estilo mensajero
+        messenger_style: Apariencia Chat
         user_data: Datos del usuario
         tags: Etiquetas
         quick_replies: Respuestas rápidas
@@ -307,12 +316,16 @@
         update_error: Error al actualizar la integración
         remove_success: Integración eliminada correctamente
         remove_error: Error al eliminar la integración
+        create_integration: Crear nueva integración
         active:
           title: Integraciones Activas
           text: Integraciones API
         available:
           title: API disponibles
           text: Servicios API disponibles
+        yours:
+          title: "Tus integraciones"
+          text:  Integraciones creadas por ti
         hints:
           hook_url: Esta integración recibirá webhook en
         delete_dialog:
@@ -389,7 +402,7 @@
         title: Idiomas
       team:
         title: Equipo
-        invitations: invitaciones
+        invitations: Invitaciones
         agents: Agentes
         invitation_success: "¡invitación enviada!"
         invitatin_error: Invitación no enviada!

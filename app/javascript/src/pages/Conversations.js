@@ -10,21 +10,20 @@ import {
   clearConversations
 } from '../actions/conversations'
 
+import ConversationSearch from '../components/conversations/Search'
+
 import FilterMenu from '../components/FilterMenu'
 
-import UserData from '../components/UserData'
 import ConversationItemList from '../components/conversations/ItemList'
 import AssignmentRules from '../components/conversations/AssignmentRules'
 import Conversation from '../components/conversations/Conversation'
 import Progress from '../components/Progress'
 import EmptyView from '../components/EmptyView'
 import Button from '../components/Button'
+import ConversationSidebar from '../components/conversations/Sidebar'
 import emptyImage from '../images/empty-icon8.png'
 import I18n from '../shared/FakeI18n'
 
-import {
-  LeftArrow
-} from '../components/icons'
 // import {toCamelCase} from '../shared/caseConverter'
 
 function Conversations ({
@@ -58,11 +57,6 @@ function Conversations ({
     )
   }
 
-  const setSort = (option) => {
-    dispatch(updateConversationsData({ sort: option }))
-    this.setState({ sort: option })
-  }
-
   const handleScroll = (e) => {
     const element = e.target
     const scrollDiff = Math.round(element.scrollHeight - element.scrollTop)
@@ -76,10 +70,6 @@ function Conversations ({
         })
       }
     }
-  }
-
-  const setFilter = (option) => {
-    dispatch(updateConversationsData({ filter: option }))
   }
 
   const filterButton = (handleClick) => {
@@ -109,7 +99,7 @@ function Conversations ({
         size="small"
       >
         {/* <MoreVertIcon /> */}
-        {I18n.t('conversations.sorts.' + conversations.sort )}
+        {I18n.t('conversations.sorts.' + conversations.sort)}
       </Button>
     )
   }
@@ -144,6 +134,16 @@ function Conversations ({
     )
   }
 
+  const clearSearchTerm = () => {
+    dispatch(
+      updateConversationsData({
+        term: null
+      }, () => {
+        fetchConversations({ page: 1 })
+      })
+    )
+  }
+
   const renderConversations = () => {
     const filters = [
       { id: 'opened', name: I18n.t('conversations.states.opened'), count: 1, icon: null },
@@ -161,13 +161,35 @@ function Conversations ({
     return (
       <React.Fragment>
 
-        <div className="bg-white px-3 py-3 border-b border-gray-200 sm:px-3 flex justify-between">
+        <div className="items-center bg-white px-3 py-4 border-b border-gray-200 sm:px-3 flex justify-between">
           <FilterMenu
             options={filters}
             value={conversations.filter}
             filterHandler={filterConversations}
             triggerButton={filterButton}
           />
+
+          <ConversationSearch/>
+
+          { /*
+                conversations.term &&
+                <span className="ml-3 text-sm leading-5 text-gray-700 flex items-center">
+                  {conversations.term}
+                  <button className="focus:outline-none" onClick={ clearSearchTerm }>
+                    <svg className="w-5 h-5 text-indigo-400 hover:text-indigo-900"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                </span>
+              */
+          }
 
           <FilterMenu
             options={sorts}
@@ -193,8 +215,18 @@ function Conversations ({
             )
           })}
 
+          { conversations.meta.total_pages === 0 &&
+            <EmptyView
+              title={I18n.t('conversations.empty.title')}
+              shadowless
+              h2Classes={`text-2xl tracking-tight
+              font-extrabold text-gray-900 sm:text-3xl
+              sm:leading-none md:text-2xl`}
+            />
+          }
+
           {
-            fetching && <div className="m-2">
+            (fetching || conversations.loading) && <div className="m-2">
               <Progress size={
                 conversations.collection.length === 0 ? '16' : '4'
               }/>
@@ -212,7 +244,6 @@ function Conversations ({
 
   return (
     <div className="flex">
-
       <Switch>
         <Route exact path={`/apps/${app.key}/conversations`}>
           <div className={'w-full md:w-1/4 h-screen md:border-r sm:hidden'}>
@@ -221,7 +252,7 @@ function Conversations ({
         </Route>
       </Switch>
 
-      <div className={'w-full md:w-1/3 h-screen md:border-r hidden sm:block border-gray-200'}>
+      <div className={'w-full md:w-4/12 h-screen md:border-r hidden sm:block border-gray-200'}>
         {renderConversations()}
       </div>
 
@@ -250,7 +281,7 @@ function Conversations ({
         </Route>
 
         <Route exact path={`/apps/${app.key}/conversations/:id`}>
-          <div className="flex-grow bg-gray-200 h-12 h-screen border-r w-1/12">
+          <div className={`${fixedSidebarOpen ? 'md:w-5/12' : 'md:w-0 md:flex-grow'} w-full bg-gray-200 h-12 h-screen border-r`}>
             <Conversation events={events}
               fixedSidebarOpen={fixedSidebarOpen}
               toggleFixedSidebar={toggleFixedSidebar}
@@ -260,22 +291,11 @@ function Conversations ({
       </Switch>
 
       {!isEmpty(conversation) && fixedSidebarOpen && (
-        <div className="w-3/12 h-screen overflow-scroll hidden sm:block">
-
-          {
-            fixedSidebarOpen &&
-              <div className="hidden md:block items-center text-gray-300 absolute mt-5">
-                <Button
-                  variant="clean"
-                  onClick={ toggleFixedSidebar }>
-                  <LeftArrow/>
-                </Button>
-              </div>
-          }
+        <div className="bg-gray-100 h-screen overflow-scroll fixed sm:relative right-0 sm:block sm:w-4/12 ">
 
           {app_user && app_user.id ? (
-            <UserData
-              data={conversation.mainParticipant}
+            <ConversationSidebar
+              toggleFixedSidebar={toggleFixedSidebar}
             />
           ) : (
             <Progress />

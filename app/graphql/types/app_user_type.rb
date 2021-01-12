@@ -36,13 +36,15 @@ module Types
 
     field :properties, Types::JsonType, null: true
 
-    field :external_profiles, [Types::ExternalProfileType], null: true 
-    
+    field :external_profiles, [Types::ExternalProfileType], null: true
+
     field :kind, String, null: false
 
     def kind
       object.class.model_name.singular
     end
+
+    field :tag_list, [String], null: true
 
     def state
       object.subscription_state
@@ -87,9 +89,7 @@ module Types
 
     def dashboard(range:, kind:)
       whitelist = %w[conversations visits]
-      unless whitelist.include?(kind)
-        raise 'no dashboard available at this address'
-      end
+      raise 'no dashboard available at this address' unless whitelist.include?(kind)
 
       AgentDashboard.new(
         app: object,

@@ -176,6 +176,7 @@ RSpec.describe Segment, type: :model do
 
       it 'with user attribute' do
         allow_any_instance_of(Segment).to receive(:predicates).and_return(email_predicate)
+
         expect(app.segments.first.execute_query.count).to be == 1
         comparator = SegmentComparator.new(
           user: app.app_users.last, 
@@ -198,9 +199,163 @@ RSpec.describe Segment, type: :model do
         expect(comparator.compare).to be_falsey
       end
 
+      let(:predicates_on_tags) do
+        [{ attribute: 'tags',
+           comparison: 'eq',
+           type: 'string',
+           value: 'foo' }.with_indifferent_access]
+      end
+
+      let(:predicates_on_tags_contains_multiple) do
+        [
+          {
+            type: 'match',
+            value: 'or'
+          }.with_indifferent_access,
+          { attribute: 'tags',
+           comparison: 'contains_ends',
+           type: 'string',
+           value: 'oo' 
+          }.with_indifferent_access,
+          { attribute: 'tags',
+            comparison: 'contains_ends',
+            type: 'string',
+            value: 'aa' 
+           }.with_indifferent_access
+        ]
+      end
+
+      let(:predicates_on_tags_contains) do
+        predicates << { attribute: 'tags',
+           comparison: 'contains_ends',
+           type: 'string',
+           value: 'oo' 
+          }.with_indifferent_access
+        
+      end
+
+      it 'with user tag' do
+        app.app_users.each{|o| o.tag_list << "foo" ; o.save }
+
+        allow_any_instance_of(Segment).to receive(:predicates).and_return(predicates_on_tags)
+        expect(app.segments.first.execute_query.size).to be == 1
+        
+        comparator = SegmentComparator.new(
+          user: app.app_users.last, 
+          predicates: predicates_on_tags 
+        )
+
+        comparator.compare
+        expect(comparator.compare).to be_truthy
+      end
+
+      it 'with user tag contains ends' do
+        app.app_users.each{|o| o.tag_list << "foo" ; o.save }
+
+        allow_any_instance_of(Segment).to receive(:predicates).and_return(
+          predicates_on_tags_contains
+        )
+
+        expect(app.segments.first.execute_query.size).to be == 1
+        
+        comparator = SegmentComparator.new(
+          user: app.app_users.last, 
+          predicates: predicates_on_tags_contains 
+        )
+
+        comparator.compare
+        expect(comparator.compare).to be_truthy
+      end
+
+      it 'with user tag multiple' do
+        app.app_users.each{|o| o.tag_list << "foo" ; o.save }
+
+        allow_any_instance_of(Segment).to receive(:predicates).and_return(
+          predicates_on_tags_contains_multiple
+        )
+
+        expect(app.segments.first.execute_query.size).to be == 1
+        
+        comparator = SegmentComparator.new(
+          user: app.app_users.last, 
+          predicates: predicates_on_tags_contains_multiple
+        )
+
+        comparator.compare
+        expect(comparator.compare).to be_truthy
+      end
+
+      let(:predicates_on_tags_contains_multiple_2) do
+        [
+          {
+            type: 'match',
+            value: 'or'
+          }.with_indifferent_access,
+          { attribute: 'name',
+           comparison: 'contains_ends',
+           type: 'string',
+           value: 'arilyn' 
+          }.with_indifferent_access,
+          { attribute: 'tags',
+            comparison: 'contains_ends',
+            type: 'string',
+            value: 'foo' 
+           }.with_indifferent_access
+        ]
+      end
+
+      it 'OR with user tag multiple and by name ' do
+        app.app_users.each{|o| o.tag_list << "foo" ; o.save }
+
+        app.app_users.first.update(name: "marilyn")
+
+        allow_any_instance_of(Segment).to receive(:predicates).and_return(
+          predicates_on_tags_contains_multiple_2
+        )
+
+        expect(app.segments.first.execute_query.size).to be == 1
+        
+        comparator = SegmentComparator.new(
+          user: app.app_users.last, 
+          predicates: predicates_on_tags_contains_multiple_2
+        )
+
+        comparator.compare
+        expect(comparator.compare).to be_truthy
+      end
+
+
+      it 'AND with user tag multiple with exclude' do
+
+        predicates = predicates_on_tags
+        predicates << { 
+          attribute: 'tags',
+          comparison: 'not_contains',
+          type: 'string',
+          value: 'marilyn' 
+         }.with_indifferent_access
+
+        app.app_users.each{|o| o.tag_list.add("foo") }
+
+        app.app_users.first.tag_list.add( "marilyn")
+
+        allow_any_instance_of(Segment).to receive(:predicates).and_return(
+          predicates
+        )
+
+        expect(app.segments.first.execute_query.size).to be == 0
+        
+        comparator = SegmentComparator.new(
+          user: app.app_users.last,
+          predicates: predicates
+        )
+
+        comparator.compare
+        expect(comparator.compare).to be_falsey
+      end
+
+
 
     end
-
-
   end
 end

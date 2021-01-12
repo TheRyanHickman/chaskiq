@@ -1,8 +1,72 @@
 # frozen_string_literal: true
 
 class AppPackagesCatalog
-  def self.packages
-    [
+  def self.packages(dev_packages: false)
+    development_packages = [
+      {
+        name: "UiCatalog",
+        description: "Sample Chaskiq UI kit, development sample",
+        capability_list: ["home", "conversations"],
+        state: 'enabled',
+        definitions: []
+      },
+
+      {
+        name: 'ExternalExample',
+        tag_list: ['editor'],
+        capability_list: ['conversations', 'home'],
+        description: 'External example, development sample',
+        icon: '',
+        state: 'enabled',
+        initialize_url: 'https://chaskiq-externa-api.glitch.me/initialize',
+        configure_url: 'https://chaskiq-externa-api.glitch.me/configure',
+        submit_url: 'https://chaskiq-externa-api.glitch.me/submit',
+        sheet_url: 'https://chaskiq-externa-api.glitch.me/sheet',
+        definitions: [
+          {
+            name: 'api_key',
+            type: 'string',
+            grid: { xs: 'w-full', sm: 'w-full' }
+          },
+        ]
+      },
+    ]
+
+    collection = [
+
+      {
+        name: "InboxSections",
+        description: "Inbox base blocks for conversation sidebar",
+        capability_list: ["inbox"],
+        state: 'enabled',
+        definitions: []
+      },
+
+      {
+        name: "ContentShowcase",
+        description: "Promote relevant content to customers within your Messenger",
+        capability_list: ["home", "conversations", "bots"],
+        state: 'enabled',
+        definitions: []
+      },
+
+      {
+        name: "ArticleSearch",
+        description: "Let customers find and read help articles",
+        capability_list: ["home"],
+        state: 'enabled',
+        definitions: []
+      },
+
+      {
+        name: "Qualifier",
+        description: "Qualification for user",
+        capability_list: ["conversations", "bots"],
+        state: 'enabled',
+        definitions: []
+      },
+
+
       {
         name: 'Clearbit',
         tag_list: ['enrichment'],
@@ -24,6 +88,7 @@ class AppPackagesCatalog
         description: 'Data Enrichment service',
         icon: 'https://logo.clearbit.com/fullcontact.com',
         state: 'enabled',
+        capability_list: ["inbox"],
         definitions: [
           {
             name: 'api_secret',
@@ -145,10 +210,10 @@ class AppPackagesCatalog
         ]
       },
 
-
       {
         name: 'Zoom',
         tag_list: ['editor'],
+        capability_list: ['conversations'],
         description: 'Zoom conference calls',
         icon: 'https://logo.clearbit.com/zoom.com',
         state: 'enabled',
@@ -189,11 +254,11 @@ class AppPackagesCatalog
         }
       },
 
-
       {
         name: 'Calendly',
         tag_list: ['editor'],
-        description: 'Clearbit data enrichment',
+        capability_list: ['conversations', 'home'],
+        description: 'Calendly meetings on conversations',
         icon: 'https://logo.clearbit.com/calendly.com',
         state: 'enabled',
         definitions: [
@@ -299,9 +364,13 @@ class AppPackagesCatalog
             grid: { xs: 'w-full', sm: 'w-full' }
           }
         ]
-      }
+      },
+      
 
     ]
+
+    collection = development_packages + collection if dev_packages
+    collection
   end
 
   def self.import
@@ -314,8 +383,8 @@ class AppPackagesCatalog
     pkg.update(data) unless pkg.blank?
   end
 
-  def self.update_all
-    packages.each do |pkg|
+  def self.update_all(dev_packages: false)
+    packages( dev_packages: dev_packages ).each do |pkg|
       package = AppPackage.find_or_create_by(name: pkg[:name])
       package.update(pkg)
     end

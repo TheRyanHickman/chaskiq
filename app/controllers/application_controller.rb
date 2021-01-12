@@ -15,16 +15,74 @@ class ApplicationController < ActionController::Base
   end
 
   def dummy_webhook
-    render status: 200, json: {ok: true}
+    render status: 200, json: { ok: true }
   end
-  
+
   def current_user
-    current_resource_owner || warden.authenticate(:agent) rescue nil
+    current_resource_owner || warden.authenticate(:agent)
+  rescue StandardError
+    nil
   end
 
   def package_iframe
-    response.headers.delete "X-Frame-Options"
-    render "app_packages/#{params[:package]}/show", layout: false
+    data = JSON.parse(params[:data])
+    url_base = data['data']['field']['action']['url']
+    url = if url_base.match(%r{^/package_iframe_internal/})
+            "#{ENV['HOST']}#{url_base}"
+          else
+            url_base
+          end
+
+    app_user = AppUser.find_by(
+      session_id: cookies[:chaskiq_session_id]
+    ).as_json(methods: %i[
+                email
+                name
+                display_name
+                avatar_url
+                first_name
+                last_name
+              ])
+
+    resp = Faraday.post(url,
+                        data.merge!(user: app_user).to_json,
+                        'Content-Type' => 'application/json')
+
+    response.headers.delete 'X-Frame-Options'
+    render html: resp.body.html_safe, layout: false
+    # render "app_packages/#{params[:package]}/show", layout: false
+  end
+
+  def package_iframe_internal
+    if params['conversation_id']
+      conversation = Conversation.find_by(key: params['conversation_id'])
+      app = conversation.app
+    else
+      app = AppUser.find(params[:user]['id']).app
+    end
+
+    presenter = app.app_package_integrations
+                   .joins(:app_package)
+                   .find_by("app_packages.name": params['package'])
+                   .presenter
+
+    opts = {
+      app_key: app.key,
+      user: params[:user],
+      field: params.dig(:data, :field),
+      values: params.dig(:data, :values)
+    }
+
+    opts.merge!({
+                  conversation_id: params.dig(:data, :conversation_id),
+                  message_id: params.dig(:data, :message_id)
+                })
+
+    html = presenter.sheet_view(opts)
+
+    response.headers.delete 'X-Frame-Options'
+
+    render html: html.html_safe, layout: false
   end
 
   def render_empty
@@ -44,12 +102,21 @@ class ApplicationController < ActionController::Base
   # Devise code
   before_action :configure_permitted_parameters, if: :devise_controller?
 
+
+  def enabled_subscriptions?
+    ENV['PADDLE_PUBLIC_KEY'].present? && 
+    ENV['PADDLE_VENDOR_ID'].present? &&
+    ENV['PADDLE_SECRET_TOKEN'].present?
+  end
+
+  helper_method :enabled_subscriptions?
+
   protected
-  
+
   # Devise methods
   # Authentication key(:username) and password field will be added automatically by devise.
   def configure_permitted_parameters
-    added_attrs = [:email, :first_name, :last_name]
+    added_attrs = %i[email first_name last_name]
     devise_parameter_sanitizer.permit :sign_up, keys: added_attrs
     devise_parameter_sanitizer.permit :account_update, keys: added_attrs
   end
@@ -58,27 +125,31 @@ class ApplicationController < ActionController::Base
     http_locale = request.headers['HTTP_LANG']
     http_splitted_locale = http_locale ? http_locale.to_s.split('-').first.to_sym : nil
 
-    locale = lang_available?(http_splitted_locale) ? 
-      http_splitted_locale : I18n.default_locale
+    locale = if lang_available?(http_splitted_locale)
+               http_splitted_locale
+             else
+               I18n.default_locale
+             end
 
     I18n.locale = begin
-                    locale
-                  rescue StandardError
-                    I18n.default_locale
-                  end
+      locale
+    rescue StandardError
+      I18n.default_locale
+    end
   end
 
   private
 
   def lang_available?(lang)
     return unless lang.present?
+
     I18n.available_locales.include?(lang.to_sym)
   end
 
   def current_resource_owner
     if doorkeeper_token && !doorkeeper_token.expired?
-      agent = Agent.find(doorkeeper_token.resource_owner_id) 
-      sign_in(agent, scope: "agent")
+      agent = Agent.find(doorkeeper_token.resource_owner_id)
+      sign_in(agent, scope: 'agent')
       agent
     end
   end

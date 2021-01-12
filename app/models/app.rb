@@ -1,5 +1,6 @@
 # frozen_string_literal: true
-require "dummy_name"
+
+require 'dummy_name'
 
 class App < ApplicationRecord
   include GlobalizeAccessors
@@ -24,6 +25,9 @@ class App < ApplicationRecord
     enable_articles_on_widget
     inline_new_conversations
     tag_list
+    user_home_apps
+    visitor_home_apps
+    inbox_apps
     paddle_user_id
     paddle_subscription_id
     paddle_subscription_plan_id
@@ -41,7 +45,7 @@ class App < ApplicationRecord
   # App.where('preferences @> ?', {notifications: true}.to_json)
 
   has_many :app_users, dependent: :destroy
-  has_many :external_profiles, through: :app_users 
+  has_many :external_profiles, through: :app_users
   has_many :bot_tasks, dependent: :destroy
   has_many :visits, through: :app_users, dependent: :destroy
   has_many :quick_replies, dependent: :destroy
@@ -59,16 +63,17 @@ class App < ApplicationRecord
   has_many :campaigns, dependent: :destroy
   has_many :user_auto_messages, dependent: :destroy
   has_many :tours, dependent: :destroy
+  has_many :banners, dependent: :destroy
   has_many :messages, dependent: :destroy
   has_many :assignment_rules, dependent: :destroy
   has_many :outgoing_webhooks, dependent: :destroy
   has_many :oauth_applications, class_name: 'Doorkeeper::Application', as: :owner, dependent: :destroy
-  belongs_to :owner, class_name: "Agent", optional: true #, foreign_key: "owner_id"
+  belongs_to :owner, class_name: 'Agent', optional: true # , foreign_key: "owner_id"
 
   has_one_attached :logo
 
   before_create :set_defaults
-  after_create :create_agent_bot, :init_app_segments
+  after_create :create_agent_bot, :init_app_segments, :attach_default_packages
 
   accepts_nested_attributes_for :article_settings
 
@@ -79,8 +84,23 @@ class App < ApplicationRecord
     agents.where('bot =?', true)
   end
 
+  def attach_default_packages
+    default_packages = %w[ContentShowcase ArticleSearch Qualifier InboxSections]
+    AppPackage.where(name: default_packages).each do |app_package|
+      app_packages << app_package unless app_package_integrations.exists?(
+        app_package_id: app_package.id 
+      )
+    end
+  end
+
   def encryption_enabled?
     encryption_key.present?
+  end
+
+  def outgoing_email_domain
+    self.preferences[:outgoing_email_domain].present? ?
+      self.preferences[:outgoing_email_domain] :
+      ENV['DEFAULT_OUTGOING_EMAIL_DOMAIN']
   end
 
   def config_fields
@@ -140,7 +160,7 @@ class App < ApplicationRecord
         hint: 'messenger text on botton',
         grid: { xs: 'w-full', sm: 'w-full' } },
 
-      { name: 'timezone', 
+      { name: 'timezone',
         type: 'timezone',
         options: ActiveSupport::TimeZone.all.map { |o| o.tzinfo.name },
         multiple: false,
@@ -151,18 +171,31 @@ class App < ApplicationRecord
 
   def add_anonymous_user(attrs)
     session_id = attrs.delete(:session_id)
+    callbacks = attrs.delete(:disable_callbacks) 
 
     next_id = DummyName::Name.new
 
-    attrs.merge!(
-      name: "visitor #{next_id}"
-    ) unless attrs.dig(:properties, :name).present?
+    unless attrs.dig(:properties, :name).present?
+      attrs.merge!(
+        name: "visitor #{next_id}"
+      )
+    end
 
     ap = app_users.visitors.find_or_initialize_by(session_id: session_id)
-    # ap.type = "Visitor"
+    ap.disable_callbacks = true if callbacks.present?
+    ap = handle_app_user_params(ap, attrs)
+    ap.generate_token
+    ap.save
+    ap
+  end
 
+  def add_lead(attrs)
+    email = attrs.delete(:email)
+    callbacks = attrs.delete(:disable_callbacks) 
+    ap = app_users.leads.find_or_initialize_by(email: email)
+    ap = handle_app_user_params(ap, attrs)
+    ap.disable_callbacks = true if callbacks.present?
     data = attrs.deep_merge!(properties: ap.properties)
-    ap.assign_attributes(data)
     ap.generate_token
     ap.save
     ap
@@ -170,16 +203,32 @@ class App < ApplicationRecord
 
   def add_user(attrs)
     email = attrs.delete(:email)
+
+    callbacks = attrs.delete(:disable_callbacks) 
     # page_url = attrs.delete(:page_url)
     ap = app_users.find_or_initialize_by(email: email)
-    data = attrs.deep_merge!(properties: ap.properties)
-    ap.assign_attributes(data)
-    if attrs[:last_visited_at].present?
-      ap.last_visited_at = attrs[:last_visited_at]
-    end
+    ap.disable_callbacks = true if callbacks.present?
+
+    ap = handle_app_user_params(ap, attrs)
+    ap.last_visited_at = attrs[:last_visited_at] if attrs[:last_visited_at].present?
     ap.subscribe! unless ap.subscribed?
     ap.type = 'AppUser'
     ap.save
+    ap
+  end
+
+  def handle_app_user_params(ap, attrs)
+    attrs = { properties: attrs } unless attrs.key?(:properties)
+    
+    keys = attrs[:properties].keys & app_user_updateable_fields
+    data_keys  = attrs[:properties].slice(*keys)
+
+    property_keys = attrs[:properties].keys - keys
+    property_params = attrs[:properties].slice(*property_keys)
+  
+    data = { properties: ap.properties.merge(property_params) }
+    ap.assign_attributes(data)
+    ap.assign_attributes(data_keys)
     ap
   end
 
@@ -218,8 +267,8 @@ class App < ApplicationRecord
       {
         email: attrs[:email],
         password: attrs[:password]
-      }, 
-      bot: nil, 
+      },
+      bot: nil,
       role_attrs: { access_list: ['manage'] }
     )
   end
@@ -270,13 +319,13 @@ class App < ApplicationRecord
     diff = a - time
     days = diff.to_f / (24 * 60 * 60)
     { at: a, diff: diff, days: days }
-  rescue Biz::Error::Configuration
+  rescue #Biz::Error::Configuration
     nil
   end
 
   def in_business_hours?(time)
     availability.in_hours?(time)
-  rescue Biz::Error::Configuration
+  rescue #Biz::Error::Configuration
     nil
   end
 
@@ -301,15 +350,14 @@ class App < ApplicationRecord
     nil
   end
 
-
   def logo_url
     return '' unless logo_blob.present?
 
     url = begin
-            logo.variant(resize_to_limit: [100, 100]).processed
-          rescue StandardError
-            nil
-          end
+      logo.variant(resize_to_limit: [100, 100]).processed
+    rescue StandardError
+      nil
+    end
     return nil if url.blank?
 
     begin
@@ -323,11 +371,47 @@ class App < ApplicationRecord
   end
 
   def searcheable_fields
-    (self.custom_fields || []) + AppUser::ENABLED_SEARCH_FIELDS
+    (custom_fields || []) + AppUser::ENABLED_SEARCH_FIELDS
+  end
+
+  def app_user_updateable_fields
+    (custom_fields || []) + AppUser::ALLOWED_PROPERTIES + AppUser::ACCESSOR_PROPERTIES 
   end
 
   def searcheable_fields_list
-    searcheable_fields.map{ |o| o["name"] }
+    searcheable_fields.map { |o| o['name'] }
+  end
+
+  def default_home_apps
+    pkg_id = app_package_integrations
+    .joins(:app_package)
+    .where(
+      "app_packages.name": 'InboxSections'
+    ).first.id rescue nil
+
+    pkg_id.present? ? [
+      {"hooKind"=>"initialize", 
+        "definitions"=>[{"type"=>"content"}], 
+        "values"=>{"block_type"=>"user-blocks"}, 
+        "id"=> pkg_id, 
+        "name"=>"InboxSections"
+      }, 
+      {"hooKind"=>"initialize", 
+        "definitions"=>[{"type"=>"content"}], 
+        "values"=>{"block_type"=>"user-properties-block"}, 
+        "id"=> pkg_id, 
+        "name"=>"InboxSections"
+    }] : []
+  end
+
+  def plan
+    if paddle_subscription_status == 'active' || paddle_subscription_status == 'trialing'
+      @plan ||= Plan.new(
+        Plan.get_by_id(paddle_subscription_plan_id.to_i) || Plan.get('free')
+      )
+    else
+      @plan = Plan.get('free')
+    end
   end
 
   private
@@ -362,5 +446,4 @@ class App < ApplicationRecord
     end
     h
   end
-
 end

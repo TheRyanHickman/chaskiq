@@ -24,12 +24,12 @@ app = FactoryBot.create(:app,
   active_messenger: 'true',
   state: 'enabled')
         
-agent = app.add_agent(
+agent = app.add_agent({
   email: 'test@test.cl', 
   name: 'sharleena',
   password: "123456",
   password_confirmation: "123456"
-)
+})
 
 agent.agent
 
@@ -38,3 +38,5 @@ Doorkeeper::Application.create(
   :name => 'authapp', 
   :redirect_uri => 'http://localhost:5002'
 )
+
+true

@@ -4,6 +4,10 @@ namespace :packages do
   task update: :environment do
     AppPackagesCatalog.update_all 
   end
+
+  task attach: :environment do
+    App.find_each{|a| a.attach_default_packages } 
+  end
 end
 
 namespace :owner_apps do
@@ -11,7 +15,7 @@ namespace :owner_apps do
     # roles owners
     App.all.each{|o| 
       o.owner = Agent.find_by(email: ENV["ADMIN_EMAIL"])
-      o.save  
+      o.save
     }
   end
 end

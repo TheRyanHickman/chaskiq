@@ -18,9 +18,8 @@ module DataEnrichmentService
         params_encoder: Faraday::FlatParamsEncoder
       }
 
-      klass = "DataEnrichmentService::#{provider.to_s.camelize}".constantize
-      k = klass.new(token: token)
-      k
+      klass = "MessageApis::#{provider.to_s.camelize}".constantize
+      klass.new(token: token)
     end
 
     def get_data(params: {})

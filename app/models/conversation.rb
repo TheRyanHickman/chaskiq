@@ -8,11 +8,11 @@ class Conversation < ApplicationRecord
   belongs_to :app
   belongs_to :assignee, class_name: 'Agent', optional: true
   belongs_to :main_participant, class_name: 'AppUser', optional: true # , foreign_key: "user_id"
-  #has_one :conversation_source, dependent: :destroy
+  # has_one :conversation_source, dependent: :destroy
   has_many :messages, class_name: 'ConversationPart', dependent: :destroy
   has_many :conversation_channels, dependent: :destroy
   has_many :conversation_part_channel_sources, through: :messages
-  has_one :latest_message,  -> { order('id desc') }, class_name: 'ConversationPart'
+  has_one :latest_message, -> { order('id desc') }, class_name: 'ConversationPart'
 
   acts_as_taggable_on :tags
 
@@ -46,6 +46,10 @@ class Conversation < ApplicationRecord
     main_participant.is_a?(Visitor)
   end
 
+  def add_conversation_assigned
+    events.log(action: :conversation_assigned)
+  end
+
   def add_started_event
     events.log(action: :conversation_started)
   end
@@ -73,10 +77,23 @@ class Conversation < ApplicationRecord
 
   def add_message(opts = {})
     part = process_message_part(opts)
-    part.save
+
+    ActiveRecord::Base.transaction do
+      part.save
+    end
 
     part.notify_to_channels if part.errors.blank?
+    part
+  end
 
+  def add_private_note(opts = {})
+    part = process_message_part(opts.merge!(private_note: true))
+
+    ActiveRecord::Base.transaction do
+      part.save
+    end
+
+    part.notify_to_channels if part.errors.blank?
     part
   end
 
@@ -88,16 +105,6 @@ class Conversation < ApplicationRecord
     }
 
     part.notify_to_channels if part.save
-
-    part
-  end
-
-  def add_private_note(opts = {})
-    part = process_message_part(opts.merge!(private_note: true))
-    part.save
-
-    part.notify_to_channels if part.errors.blank?
-
     part
   end
 
@@ -116,17 +123,20 @@ class Conversation < ApplicationRecord
     part.private_note = opts[:private_note]
     part.message_source = opts[:message_source] if opts[:message_source]
     part.email_message_id = opts[:email_message_id]
-    
-    part.conversation_part_channel_sources.new({
-      provider: opts[:provider], 
-      message_source_id: opts[:message_source_id]
-    }) if opts[:provider].present? && opts[:message_source_id].present?
-    
+
+    if opts[:provider].present? && opts[:message_source_id].present?
+      part.conversation_part_channel_sources.new({
+                                                   provider: opts[:provider],
+                                                   message_source_id: opts[:message_source_id]
+                                                 })
+    end
+
     part
   end
 
   def assign_user(user)
-    return if self.assignee.present? && self.assignee.id === user.id
+    return if assignee.present? && assignee.id === user.id
+
     self.assignee = user
     if save
       add_message_event(
@@ -137,6 +147,8 @@ class Conversation < ApplicationRecord
           email: user.email
         }
       )
+
+      add_conversation_assigned
     end
   end
 

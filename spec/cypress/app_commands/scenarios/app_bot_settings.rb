@@ -23,7 +23,7 @@ app = FactoryBot.create(:app,
   state: 'enabled'
 )
 
-agent = app.add_agent(email: 'test@test.cl', name: 'sharleena')
+agent = app.add_agent({email: 'test@test.cl', name: 'sharleena'})
 # user = app.add_user({email: "test@test.cl"})
 
 app.update(
@@ -32,7 +32,7 @@ app.update(
     delay: false,
     routing: 'assign',
     email_requirement: 'email_only',
-    assignee: agent.agent,
+    assignee: agent.agent.id,
     share_typical_time: true
   },
   email_requirement: command_options.fetch('email_requirement'),

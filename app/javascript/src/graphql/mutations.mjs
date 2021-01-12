@@ -1,43 +1,22 @@
+import {
+  appFragment
+} from './fragments.mjs'
+
 export const UPDATE_APP = `
   mutation AppsUpdate($appKey: String!, $appParams: Json!){
     appsUpdate(appKey: $appKey, appParams: $appParams){
       errors
       app{
-        encryptionKey
-        key
-        name
-        preferences
-        configFields
-        theme
-        activeMessenger
-        translations
-        availableLanguages
-        logo
-        enableArticlesOnWidget
-        inlineNewConversations
-        teamSchedule
-        timezone
-        replyTime
-        inboundSettings
-        emailRequirement
-        leadTasksSettings
-        userTasksSettings
-        gatherSocialData
-        registerVisits
-        domainUrl
-        outgoingEmailDomain
-        customizationColors
-        customFields
-        tagList
-        subscriptionsEnabled
-        segments {
-          name
-          id
-          properties
-        }
-        state
-        tagline
+        ${appFragment}
       }
+    }
+  }
+`;
+
+export const IMPORT_CONTACTS = `
+  mutation ImportContact($appKey: String!, $appParams: Json!){
+    importContacts(appKey: $appKey, appParams: $appParams){
+      errors
     }
   }
 `;
@@ -55,26 +34,7 @@ export const CREATE_APP = `
     appsCreate(appParams: $appParams, operation: $operation){
       errors
       app{
-        encryptionKey
-        key
-        name
-        preferences
-        configFields
-        theme
-        state
-        tagline
-        enableArticlesOnWidget
-        inlineNewConversations
-        activeMessenger
-        teamSchedule
-        logo
-        timezone
-        inboundSettings
-        emailRequirement
-        leadTasksSettings
-        userTasksSettings
-        customFields
-        subscriptionsEnabled
+        ${appFragment}
       }
     }
   }
@@ -223,6 +183,7 @@ export const START_CONVERSATION = `
         lastMessage{
           source
           createdAt
+          key
           message{
             htmlContent
             textContent
@@ -251,6 +212,7 @@ export const INSERT_COMMMENT = `
   mutation InsertComment($appKey: String!, $id: String!, $message: Json!){
     insertComment(appKey: $appKey, id: $id, message: $message){
       message{
+        key
         message{
           htmlContent
           textContent
@@ -291,13 +253,16 @@ export const INSERT_APP_BLOCK_COMMMENT = `
   mutation InsertAppBlockComment($appKey: String!, $id: String!, $controls: Json!){
     insertAppBlockComment(appKey: $appKey, id: $id, controls: $controls){
       message{
+        key
+        readAt
+        source
+        emailMessageId
         message{
           htmlContent
           textContent
           serializedContent
           blocks
         }
-        readAt
         appUser{
           id
           email
@@ -305,7 +270,6 @@ export const INSERT_APP_BLOCK_COMMMENT = `
           displayName
           avatarUrl
         }
-        source
         messageSource {
           name
           state
@@ -313,7 +277,6 @@ export const INSERT_APP_BLOCK_COMMMENT = `
           fromEmail
           serializedContent
         }
-        emailMessageId
       }
     }
   }
@@ -342,8 +305,11 @@ export const INSERT_NOTE = `
           textContent
           serializedContent
         }
+        key
         readAt
         createdAt
+        source
+        emailMessageId
         appUser{
           id
           email
@@ -351,7 +317,6 @@ export const INSERT_NOTE = `
           displayName
           avatarUrl
         }
-        source
         messageSource {
           name
           state
@@ -359,7 +324,6 @@ export const INSERT_NOTE = `
           fromEmail
           serializedContent
         }
-        emailMessageId
       }
     }
   }
@@ -561,6 +525,7 @@ export const UPDATE_CAMPAIGN = `
         fromEmail
         replyEmail
         steps
+        bannerData
       }
     }
   }
@@ -654,6 +619,7 @@ export const CREATE_CAMPAIGN = `
         fromEmail
         replyEmail
         steps
+        bannerData
       }
     }
   }
@@ -674,7 +640,7 @@ export const PREDICATES_SEARCH = `
           state
           displayName
           online
-
+          tagList
           referrer
           ip
           city
@@ -1296,6 +1262,7 @@ export const UPDATE_OAUTH_APP = `
         redirectUri
         secret
         uid
+        scopes
       }
       errors
     }
@@ -1368,6 +1335,77 @@ export const DELETE_INTEGRATION = `
         icon
         state
         description
+      }
+    }
+  }
+`;
+
+
+
+export const CREATE_PACKAGE = `
+  mutation CreatePackage($appKey: String!, $appPackage: String! , $params: Json!){
+    appPackagesCreate(appKey: $appKey, appPackage: $appPackage, params: $params){
+      errors
+      appPackage {
+        id
+        name
+        icon
+        state
+        name
+        definitions
+        description
+        initializeUrl
+        configureUrl
+        submitUrl
+        sheetUrl
+        capabilities
+        oauthUrl
+      }
+    }
+  }
+`;
+
+export const UPDATE_PACKAGE = `
+  mutation UpdatePackage($appKey: String!, $id: String!, , $params: Json!){
+    appPackagesUpdate(appKey: $appKey, id: $id, params: $params){
+      errors
+      appPackage {
+        id
+        name
+        icon
+        state
+        name
+        definitions
+        description
+        initializeUrl
+        configureUrl
+        submitUrl
+        sheetUrl
+        capabilities
+        oauthUrl
+      }
+    }
+  }
+`;
+
+export const DELETE_PACKAGE = `
+  mutation DeletePackage($appKey: String!, $id: String!){
+    appPackagesDelete(appKey: $appKey, id: $id){
+      errors
+      appPackage {
+        id
+        name
+        icon
+        state
+        name
+        definitions
+        description
+        initializeUrl
+        configureUrl
+        submitUrl
+        sheetUrl
+        capabilities
+        oauthUrl
       }
     }
   }

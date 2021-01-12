@@ -8,19 +8,19 @@ module Mutations
       argument :params, Types::JsonType, required: true
       argument :email, String, required: true
 
-
-      # TODO ROLE AWARE
+      # TODO: ROLE AWARE
       def resolve(app_key:, email:, params:)
         app = current_user.apps.find_by(key: app_key)
-
-        authorize! app, to: :update_agent?, with: AppPolicy
-        
         agent = app.agents.find_by(email: email) # , name: 'John Doe')
 
+        authorize! agent, to: :update_agent?, with: AppPolicy, context: {
+          role: app.roles.find_by(agent_id: current_user.id),
+        }
+
         data = params.permit(
-          :name, 
-          :avatar, 
-          :lang, 
+          :name,
+          :avatar,
+          :lang,
           :first_name,
           :last_name,
           :country,
@@ -31,7 +31,7 @@ module Mutations
           :available
         )
 
-        #data.merge!({avatar: avatar}) if avatar.present?
+        # data.merge!({avatar: avatar}) if avatar.present?
 
         agent.update(data)
 

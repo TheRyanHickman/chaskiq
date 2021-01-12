@@ -9,44 +9,49 @@ class AppUser < ApplicationRecord
   include Redis::Objects
 
   ENABLED_SEARCH_FIELDS = [
-    { 'name'=> 'email', 'type'=> 'string' },
-    { 'name'=> 'postal', 'type'=> 'string' },
-    { 'name'=> 'name', 'type'=> 'string' },
-    { 'name'=> 'first_name', 'type'=> 'string' },
-    { 'name'=> 'last_name', 'type'=> 'string' },
-    { 'name'=> 'company_name', 'type'=> 'string' },
-    { 'name'=> 'company_size', 'type'=> 'string' },
-    { 'name'=> 'phone', 'type'=> 'string' }
+    { 'name' => 'email', 'type' => 'string' },
+    { 'name' => 'postal', 'type' => 'string' },
+    { 'name' => 'name', 'type' => 'string' },
+    { 'name' => 'first_name', 'type' => 'string' },
+    { 'name' => 'last_name', 'type' => 'string' },
+    { 'name' => 'company_name', 'type' => 'string' },
+    { 'name' => 'company_size', 'type' => 'string' },
+    { 'name' => 'phone', 'type' => 'string' }
   ].freeze
 
   BROWSING_FIELDS = [
-    { 'name'=> 'lang', 'type'=> 'string' },
-    { 'name'=> 'type', 'type'=> 'string' },
-    { 'name'=> 'last_visited_at', 'type'=> 'date' },
-    { 'name'=> 'referrer', 'type'=> 'string' },
-    { 'name'=> 'state', 'type'=> 'string' },
-    { 'name'=> 'ip', 'type'=> 'string' },
-    { 'name'=> 'city', 'type'=> 'string' },
-    { 'name'=> 'region', 'type'=> 'string' },
-    { 'name'=> 'country', 'type'=> 'string' },
-    { 'name'=> 'lat', 'type'=> 'string' },
-    { 'name'=> 'lng', 'type'=> 'string' },
-    { 'name'=> 'web_sessions', 'type'=> 'string' },
-    { 'name'=> 'timezone', 'type'=> 'string' },
-    { 'name'=> 'browser', 'type'=> 'string' },
-    { 'name'=> 'browser_version', 'type'=> 'string' },
-    { 'name'=> 'os', 'type'=> 'string' },
-    { 'name'=> 'os_version', 'type'=> 'string' },
-    { 'name'=> 'browser_language', 'type'=> 'string' }
+    { 'name' => 'lang', 'type' => 'string' },
+    { 'name' => 'type', 'type' => 'string' },
+    { 'name' => 'last_visited_at', 'type' => 'date' },
+    { 'name' => 'tags', 'type' => 'string' },
+    { 'name' => 'referrer', 'type' => 'string' },
+    { 'name' => 'state', 'type' => 'string' },
+    { 'name' => 'ip', 'type' => 'string' },
+    { 'name' => 'city', 'type' => 'string' },
+    { 'name' => 'region', 'type' => 'string' },
+    { 'name' => 'country', 'type' => 'string' },
+    { 'name' => 'lat', 'type' => 'string' },
+    { 'name' => 'lng', 'type' => 'string' },
+    { 'name' => 'web_sessions', 'type' => 'string' },
+    { 'name' => 'timezone', 'type' => 'string' },
+    { 'name' => 'browser', 'type' => 'string' },
+    { 'name' => 'browser_version', 'type' => 'string' },
+    { 'name' => 'os', 'type' => 'string' },
+    { 'name' => 'os_version', 'type' => 'string' },
+    { 'name' => 'browser_language', 'type' => 'string' }
   ].freeze
+
+  attr_accessor :disable_callbacks
 
   # belongs_to :user
   belongs_to :app
   has_many :conversations, foreign_key: :main_participant_id, dependent: :destroy
   # has_many :metrics , as: :trackable
-  has_many :metrics
-  has_many :visits
+  has_many :metrics, dependent: :destroy
+  has_many :visits, dependent: :destroy
   has_many :external_profiles, dependent: :destroy
+
+  acts_as_taggable_on :tags
 
   include Eventable
 
@@ -54,7 +59,34 @@ class AppUser < ApplicationRecord
 
   after_save :enqueue_social_enrichment, if: :saved_change_to_email?
 
-  store_accessor :properties, [
+  ALLOWED_PROPERTIES = [
+    :ip, 
+    :city, 
+    :region, 
+    :country, 
+    :session_id, 
+    :email, 
+    :lat,
+    :lng,
+    :postal, 
+    :web_sessions, 
+    :timezone, 
+    :browser, 
+    :browser_version, 
+    :os, 
+    :os_version, 
+    :browser_language, 
+    :lang, 
+    :created_at,
+    :updated_at,
+    :last_seen, 
+    :first_seen, 
+    :signed_up, 
+    :last_contacted, 
+    :last_heard_from
+  ]
+
+  ACCESSOR_PROPERTIES = [
     :name,
     :first_name,
     :last_name,
@@ -68,8 +100,18 @@ class AppUser < ApplicationRecord
     :gender,
     :organization,
     :job_title,
-    :phone
+    :phone,
+    :company_name,
+    :company_size
   ]
+
+  store_accessor :properties, ACCESSOR_PROPERTIES
+
+  ACCESSOR_PROPERTIES.each do |prop|
+    ransacker prop do |parent|
+      Arel::Nodes::InfixOperation.new('->>', parent.table[:properties], Arel::Nodes.build_quoted(prop))
+    end
+  end
 
   scope :availables, lambda {
     where(['app_users.subscription_state =? or app_users.subscription_state=?',
@@ -90,7 +132,7 @@ class AppUser < ApplicationRecord
 
   # from redis-objects
   counter :new_messages
-  value :trigger_locked, expireat: lambda { Time.now + 5.seconds }
+  value :trigger_locked, expireat: -> { Time.now + 5.seconds }
 
   aasm column: :subscription_state do # default column: aasm_state
     state :passive, initial: true
@@ -125,15 +167,22 @@ class AppUser < ApplicationRecord
     %w[passive subscribed].include?(subscription_state)
   end
 
+  def calbackable?
+    !@disable_callbacks
+  end
+
   def add_created_event
+    return unless calbackable?
     events.log(action: :user_created)
   end
 
   def add_email_changed_event
+    return unless calbackable?
     events.log(action: :email_changed)
   end
 
   def lead_event
+    return unless calbackable?
     events.log(action: :visitors_convert)
   end
 
@@ -148,19 +197,17 @@ class AppUser < ApplicationRecord
   def generate_token
     self.session_id = loop do
       random_token = SecureRandom.urlsafe_base64(nil, false)
-      unless app.app_users.where(session_id: random_token).any?
-        break random_token
-      end
+      break random_token unless app.app_users.where(session_id: random_token).any?
     end
   end
 
   # delegate :email, to: :user
 
   def as_json(options = nil)
-    super({ 
-            only: %i[id kind display_name avatar_url],
-            methods: %i[id kind display_name avatar_url] 
-          }.merge(options || {}))
+    super({
+      only: %i[id kind display_name avatar_url],
+      methods: %i[id kind display_name avatar_url]
+    }.merge(options || {}))
   end
 
   def offline?
@@ -226,20 +273,22 @@ class AppUser < ApplicationRecord
 
   def encoded_id
     return nil if email.blank?
+
     URLcrypt.encode(email)
   end
 
   def decoded_id
     return nil if email.blank?
+
     URLcrypt.decode(email)
   end
 
   def avatar_url
-    return "https://api.adorable.io/avatars/130/#{id}.png?" if email.blank?
+    ui_avatar_url = "https://ui-avatars.com/api/#{URI.encode_www_form_component(display_name)}/128"
+    return "#{ui_avatar_url}/f5f5dc/888/4" if email.blank?
     email_address = email.downcase
     hash = Digest::MD5.hexdigest(email_address)
-    d = "https://api.adorable.io/avatars/130/#{hash}.png"
-    image_src = "https://www.gravatar.com/avatar/#{hash}?d=#{d}"
+    image_src = "https://www.gravatar.com/avatar/#{hash}?d=#{ui_avatar_url}/7fffd4"
   end
 
   def kind
@@ -258,24 +307,24 @@ class AppUser < ApplicationRecord
   end
 
   def enqueue_social_enrichment
+    return unless calbackable?
     add_email_changed_event
   end
 
   def register_visit(options)
-    self.visits.register(options, app.register_visits)
+    visits.register(options, app.register_visits)
   end
 
   def register_in_crm
-    crm_tags = app.app_packages.tagged_with("crm").pluck(:id)
+    crm_tags = app.app_packages.tagged_with('crm').pluck(:id)
     integrations = app.app_package_integrations.includes(:app_package)
-    .where(app_package: crm_tags)
+                      .where(app_package: crm_tags)
 
-    integrations.each do |integration|
-      profile = self.external_profiles.find_or_create_by(
+    integrations.each do |_integration|
+      profile = external_profiles.find_or_create_by(
         provider: pkg.name.downcase
       )
       profile.sync
     end
   end
-
 end

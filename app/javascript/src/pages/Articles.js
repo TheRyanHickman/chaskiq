@@ -14,6 +14,7 @@ import CircularProgress from "../components/Progress";
 import { errorMessage, successMessage } from "../actions/status_messages";
 import Hints from "../shared/Hints";
 
+import DeleteDialog from '../components/DeleteDialog'
 import { AnchorLink } from "../shared/RouterLink";
 
 import { LinkButton, LinkIconButton } from "../shared/RouterLink";
@@ -216,7 +217,6 @@ class Articles extends Component {
                                 href={`https://${this.state.settings.subdomain}.chaskiq.io`}
                                 variant="outlined"
                                 color="inherit"
-                                size="small"
                                 target={"blank"}
                                 className="mr-2"
                               >
@@ -454,7 +454,7 @@ class AllArticles extends React.Component {
                   title: I18n.t("definitions.articles.title.label"),
                   render: (row) =>
                     row ? (
-                      <td className="px-6 py-4 whitespace-no-wrap border-b border-gray-200">
+                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-200">
                         <div className="flex items-center text-lg font-bold">
                           {row.id && (
                             <Link
@@ -475,7 +475,7 @@ class AllArticles extends React.Component {
                   title: I18n.t("definitions.articles.author.label"),
                   render: (row) =>
                     row ? (
-                      <td className="px-6 py-4 whitespace-no-wrap border-b border-gray-200">
+                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-200">
                         <div className="flex items-center">
                           <span>
                             <b className="font-bold">
@@ -493,7 +493,7 @@ class AllArticles extends React.Component {
                   title: I18n.t("definitions.articles.state.label"),
                   render: (row) =>
                     row && (
-                      <td className="px-6 py-4 whitespace-no-wrap border-b border-gray-200">
+                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-200">
                         <div className="flex items-center">
                           <Badge
                             variant={
@@ -521,7 +521,7 @@ class AllArticles extends React.Component {
                   title: I18n.t("definitions.articles.collection.label"),
                   render: (row) =>
                     row && (
-                      <td className="px-6 py-4 whitespace-no-wrap border-b border-gray-200">
+                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-200">
                         <div className="flex items-center">
                           {row.collection && (
                             <Link
@@ -539,7 +539,7 @@ class AllArticles extends React.Component {
                   title: I18n.t("definitions.articles.actions.label"),
                   render: (row) =>
                     row && (
-                      <td className="px-6 py-4 whitespace-no-wrap border-b border-gray-200">
+                      <td className="px-6 py-4 whitespace-nowrap border-b border-gray-200">
                         <div className="flex items-center">
                           <Button
                             variant={"danger"}

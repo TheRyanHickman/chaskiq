@@ -2,12 +2,10 @@ import styled from '@emotion/styled'
 import { keyframes } from '@emotion/core'
 
 import React from 'react'
-
 import StyledFrame from '../styledFrame'
 import { darken } from 'polished'
-
 import { textColor } from './utils'
-
+import tw from 'twin.macro'
 export const mainColor = '#0a1a27' // "#42a5f5";
 
 const rotate = keyframes`
@@ -176,6 +174,12 @@ export const ShowMoreWrapper = styled.div`
 
 `
 
+
+export const DisabledElement = styled.div`
+  padding: 1.2em !important;
+  ${() => tw`w-full p-4 flex justify-center` }
+`
+
 const Button = styled.button`
   color: turquoise;
 `
@@ -274,9 +278,9 @@ export const UserAutoMessageStyledFrameDis = styled(({ isMinimized, ...rest }) =
 
 export const CloseButtonWrapper = styled.div`
   position: absolute;
-  right: 10px;
+  right: 21px;
   z-index: 30000;
-  top: 22px;
+  top: 29px;
   button {
     border: none;
     background: transparent;
@@ -344,7 +348,7 @@ export const MessageSpinner = styled.div`
   font-weight: 200;
   opacity: 0.2;
   margin: 0;
-  width: 30px;
+  width: 80px;
   text-align: center;
 
   & > div {
@@ -420,10 +424,10 @@ export const ConversationEventContainer = styled.div`
 `
 
 export const AppPackageBlockContainer = styled.div`
-    padding: .7em;
+    padding-top: .7em;
     border-radius: 7px;
-    display: flex;
-    justify-content: center;
+    //display: flex;
+    //justify-content: center;
     margin: .7em;
     //border: 1px solid #e3e7e8;
     background: #fff;
@@ -725,26 +729,21 @@ export const FooterAck = styled(FooterAckInline)`
 `
 
 export const CountBadge = styled.div`
-  position: absolute;
-  border-radius: 50%;
-  /* height: 20px; */
-  width: 13px;
-  padding: 4px;
-  background-color: red;
-  font-size: 10px;
-  text-align: center;
-  color: #f3f3f3;
+
+  ${()=> tw`h-6 w-6 rounded-full text-white text-center p-1 absolute bg-red-600 text-xs` }
   ${(props) => props.section === 'home'
     ? `top: 42px;
     left: 15px;` : ''
   }
+
+  top: 0px;
+  left: -8px;
 
   ${(props) => props.section === 'conversation'
   ? 'top: 13px;left: 7px;' : ''}
 
   ${(props) => props.section === 'conversations'
   ? 'top: 13px;left: 7px;' : ''}
-
 }
 
 `
@@ -926,10 +925,9 @@ export const MessageItem = styled.div`
         min-width: 80px;
         padding: 16px;
         margin: 5px;
+        margin-right: 10px;
         border-radius: 6px;
         min-width: 80px;
-
-
         box-shadow: 0 4px 15px 0 rgba(0,0,0,.1), 0 1px 2px 0 rgba(0,0,0,.1);
 
         ${
@@ -1012,13 +1010,17 @@ export const HeaderOption = styled.div`
 `
 
 export const HeaderTitle = styled.span`
+  ${ () => tw`space-y-2`}
   .title{
-    margin: 0em 0.2em;
+    //font-size: 2em;
+    //font-weight: bold;
+    //margin: 0em 0.2em;
+    ${ () => tw`text-3xl antialiased font-bold`}
   }
   p.tagline{
-    margin: 0.6em 0.3em;
-    font-size: 0.9em;
-    line-height: 1.6em;
+    //margin: 0.6em 0.3em;
+    //line-height: 1.6em;
+    ${ () => tw`text-sm antialiased font-light mb-3`}
   }
   /*${(props) => FadeRightAnimation(props)}*/
 `
@@ -1084,12 +1086,19 @@ export const AnchorButton = styled.a`
   align-items: center;
 `
 
+export const NewConvoBtnContainer = styled.div`
+position: absolute;
+bottom: 77px;
+width: 100%;
+padding: 0 37px;
+display:flex;
+justify-content: center;
+`
+// ${(props) => FadeBottomAnimation(props)}
+
+
 export const NewConvoBtn = styled(AnchorButton)`
-    position: absolute;
-    bottom: 77px;
-    left: 20%;
-    padding: 0 37px;
-    ${(props) => FadeBottomAnimation(props)}
+
 `
 
 export const ConversationSummary = styled.div`
@@ -1156,11 +1165,14 @@ export const Autor = styled.div`
 `
 
 export const Hint = styled.p`
-    padding: 29px;
+  /*  padding: 29px;
     color: rgb(136, 136, 136);
     background: #f9f9f9;
     margin: 0px;
-    height: 100%;
+    height: 100%;*/
+
+  ${ ()=> tw`text-sm leading-5 text-gray-500 h-full p-8 bg-gray-100` }
+
 `
 
 export const SpinnerAnim = keyframes`

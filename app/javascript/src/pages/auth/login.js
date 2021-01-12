@@ -35,8 +35,14 @@ function Login ({ dispatch }) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
+<<<<<<< HEAD
         <h2 className="mt-6 text-center text-2xl leading-9 font-extrabold text-gray-900">
           Flowmetrics Pro
+=======
+        <img className="mx-auto h-20 w-auto" src={logo} alt="Chaskiq" />
+        <h2 className="mt-6 text-center text-1xl leading-3 font-light text-gray-400">
+          Sign in to your account
+>>>>>>> 17b18693ec9b6c28f756078fb26c898962012620
         </h2>
         {/*<p className="mt-2 text-center text-sm leading-5 text-gray-600 max-w">
           Or {' '}

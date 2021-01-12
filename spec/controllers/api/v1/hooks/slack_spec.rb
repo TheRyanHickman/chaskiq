@@ -242,13 +242,13 @@ RSpec.describe Api::V1::Hooks::ProviderController, type: :controller do
     }
   }
   
-  def message_blocks(global: false, channel: nil, additional_data: nil)
+  def message_blocks(global: false, channel: nil, additional_data: nil, message: "the message")
     payload = {
       "team_id"=>"TQUC0ASKT",
       "event"=>{
         "client_msg_id"=>"xxx",
       "type"=>"message",
-      "text"=>"the message",
+      "text"=>message,
       "user"=>"AAAAA",
       "ts"=>"1580785266.001000",
       "thread_ts"=>"123",
@@ -256,7 +256,7 @@ RSpec.describe Api::V1::Hooks::ProviderController, type: :controller do
         [{"type"=>"rich_text",
           "block_id"=>"n+w",
           "elements"=>[{"type"=>"rich_text_section", 
-            "elements"=>[{"type"=>"text", "text"=>"the message"}]}]}],
+            "elements"=>[{"type"=>"text", "text"=>message}]}]}],
       "channel"=>channel,
       "event_ts"=>"1580785266.001000",
       "channel_type"=>"channel"
@@ -284,38 +284,11 @@ RSpec.describe Api::V1::Hooks::ProviderController, type: :controller do
   end
 
   let!(:agent_role) do
-    app.add_agent(email: 'test2@test.cl')
+    app.add_agent({email: 'test2@test.cl'})
   end
 
-  let!(:app_package) do
-    definitions = [
-      {
-        name: 'api_secret',
-        type: 'string',
-        grid: { xs: 12, sm: 12 }
-      },
-      {
-        name: 'api_key',
-        type: 'string',
-        grid: { xs: 12, sm: 12 }
-      },
-      {
-        name: 'access_token',
-        type: 'string',
-        grid: { xs: 12, sm: 12 }
-      },
-      {
-        name: 'access_token_secret',
-        type: 'string',
-        grid: { xs: 12, sm: 12 }
-      }
-    ]
-
-    AppPackage.create(
-      name: 'Slack', 
-      tag_list: ['email_changed', 'conversation.user.first.comment'],
-      definitions: definitions
-    )
+  let(:app_package) do
+    AppPackage.find_by(name: 'Slack')
   end
 
   let(:conversation) do
@@ -326,7 +299,9 @@ RSpec.describe Api::V1::Hooks::ProviderController, type: :controller do
   end
 
   describe "triggers" do
-
+    before do
+      AppPackagesCatalog.update_all
+    end
     before :each do 
       ActiveJob::Base.queue_adapter = :test
       ActiveJob::Base.queue_adapter.perform_enqueued_at_jobs = true
@@ -339,7 +314,6 @@ RSpec.describe Api::V1::Hooks::ProviderController, type: :controller do
         app_package: app_package,
         external_id: 'TQUC0ASKT'
       )
-
     end
 
 
@@ -377,7 +351,9 @@ RSpec.describe Api::V1::Hooks::ProviderController, type: :controller do
 
 
   describe "hooks" do
-
+    before do
+      AppPackagesCatalog.update_all
+    end
     before :each do
 
       ActiveJob::Base.queue_adapter = :test
@@ -509,6 +485,18 @@ RSpec.describe Api::V1::Hooks::ProviderController, type: :controller do
         )
         expect(conversation.messages.last.authorable).to be_a(Agent)
         expect(conversation.messages.last.messageable.html_content).to be == "the message"
+      end
+
+      it "receive message with emojis" do
+        get(:global_process_event, 
+          params: message_blocks(
+            global: true,
+            channel: @channel.provider_channel_id,
+            message: "hello :+1: there"
+          )
+        )
+        expect(conversation.messages.last.authorable).to be_a(Agent)
+        expect(conversation.messages.last.messageable.html_content).to be == "hello 👍 there"
       end
 
       it "receive message multiline" do

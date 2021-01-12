@@ -18,7 +18,7 @@ class UserAutoMessage < Message
     AND metrics.trackable_id = campaigns.id
     AND metrics.app_user_id = #{user.id}
     AND settings->'hidden_constraints' ? metrics.action")
-    .where('metrics.id is null')
+           .where('metrics.id is null')
 
     ## THIS WILL RETURN CAMPAINGS ON EMPTY METRICS FOR USER
     # enabled.in_time.joins("left outer join metrics
@@ -42,8 +42,8 @@ class UserAutoMessage < Message
         multiple: true,
         default: 'open',
         grid: { xs: 'w-full', sm: 'w-full' } },
-      { name: 'scheduledAt', label: "Scheduled at", type: 'datetime', grid: { xs: 'w-full', sm: 'w-1/2' } },
-      { name: 'scheduledTo', label: "Scheduled to", type: 'datetime', grid: { xs: 'w-full', sm: 'w-1/2' } }
+      { name: 'scheduledAt', label: 'Scheduled at', type: 'datetime', grid: { xs: 'w-full', sm: 'w-1/2' } },
+      { name: 'scheduledTo', label: 'Scheduled to', type: 'datetime', grid: { xs: 'w-full', sm: 'w-1/2' } }
     ]
   end
 
@@ -54,12 +54,6 @@ class UserAutoMessage < Message
         keys: [{ name: 'open', color: '#F4F5F7' },
                { name: 'click', color: '#0747A6' }]
       },
-      {
-        name: 'ClickRateCount', label: 'ClickRateCount',
-        keys: [{ name: 'open', color: '#F4F5F7' },
-               { name: 'close', color: '#0747A6' }]
-      },
-
       {
         name: 'OpenRateCount', label: 'OpenRateCount',
         keys: [{ name: 'open', color: '#F4F5F7' },
@@ -83,10 +77,10 @@ class UserAutoMessage < Message
   # consumed
   def available_for_user?(user)
     comparator = SegmentComparator.new(
-      user: user, 
+      user: user,
       predicates: segments
     )
-    comparator.compare #&& metrics.where(app_user_id: user.id).blank?
+    comparator.compare # && metrics.where(app_user_id: user.id).blank?
   rescue ActiveRecord::RecordNotFound
     false
   end
@@ -132,8 +126,7 @@ class UserAutoMessage < Message
     compiled_premailer = html_content.to_s.gsub('%7B%7B', '{{').gsub('%7D%7D', '}}')
     compiled_mustache = Mustache.render(compiled_premailer, subscriber_options)
 
-    html = LinkRenamer.convert(compiled_mustache, link_prefix)
-    html
+    LinkRenamer.convert(compiled_mustache, link_prefix)
   end
 
   def self.broadcast_message_to_user(user)
@@ -156,38 +149,35 @@ class UserAutoMessage < Message
     messages.any?
   end
 
-
-=begin
-  def self.broadcast_message_to_user(user)
-    app = user.app
-    key = "#{app.key}-#{user.session_id}"
-    ret = nil
-    app.user_auto_messages.availables_for(user).each do |message|
-
-      next if message.blank? || !message.available_for_user?(user)
-
-      MessengerEventsChannel.broadcast_to(key,
-                                          type: 'messages:receive',
-                                          data: [message.as_json(
-                                            only: %i[id
-                                            created_at
-                                            updated_at
-                                            serialized_content
-                                            theme])])
-
-      user.metrics.create(
-        trackable: message,
-        action: 'messages.delivered'
-      )
-
-      ret = true
-
-      break
-
-    end
-
-    ret
-
-  end
-=end
+  #   def self.broadcast_message_to_user(user)
+  #     app = user.app
+  #     key = "#{app.key}-#{user.session_id}"
+  #     ret = nil
+  #     app.user_auto_messages.availables_for(user).each do |message|
+  #
+  #       next if message.blank? || !message.available_for_user?(user)
+  #
+  #       MessengerEventsChannel.broadcast_to(key,
+  #                                           type: 'messages:receive',
+  #                                           data: [message.as_json(
+  #                                             only: %i[id
+  #                                             created_at
+  #                                             updated_at
+  #                                             serialized_content
+  #                                             theme])])
+  #
+  #       user.metrics.create(
+  #         trackable: message,
+  #         action: 'messages.delivered'
+  #       )
+  #
+  #       ret = true
+  #
+  #       break
+  #
+  #     end
+  #
+  #     ret
+  #
+  #   end
 end

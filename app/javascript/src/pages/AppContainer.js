@@ -2,13 +2,14 @@ import React from 'react'
 
 import Sidebar from '../components/sidebar'
 import { Switch, Route, withRouter } from 'react-router-dom'
-
+import { isEmpty } from 'lodash'
 import { camelizeKeys } from '../actions/conversation'
 
 import Dashboard from './Dashboard'
 import Platform from './Platform'
 import Conversations from './Conversations'
 import Settings from './Settings'
+import MessengerSettings from './MessengerSettings'
 import Team from './Team'
 import Webhooks from './Webhooks'
 import Integrations from './Integrations'
@@ -17,6 +18,7 @@ import Bots from './Bots'
 import Campaigns from './Campaigns'
 import CampaignHome from './campaigns/home'
 import Progress from '../components/Progress'
+import UserSlide from '../components/UserSlide'
 import Profile from './Profile'
 import AgentProfile from './AgentProfile'
 import Billing from './Billing'
@@ -24,6 +26,7 @@ import Api from './Api'
 
 import { connect } from 'react-redux'
 
+import UpgradePage from './UpgradePage'
 // import Pricing from '../pages/pricingPage'
 
 import { getCurrentUser } from '../actions/current_user'
@@ -38,13 +41,12 @@ import { updateRtcEvents } from '../actions/rtc'
 import { updateCampaignEvents } from '../actions/campaigns'
 
 import {
-
   appendConversation
 } from '../actions/conversations'
 
 import { toggleDrawer } from '../actions/drawer'
 
-import UserData from '../components/UserData'
+import UserProfileCard from '../components/UserProfileCard'
 import LoadingView from '../components/loadingView'
 
 const CableApp = {
@@ -59,7 +61,8 @@ function App ({
   app,
   drawer,
   app_user,
-  loading
+  loading,
+  upgradePages
 }) {
 
   React.useEffect(() => {
@@ -164,7 +167,7 @@ function App ({
         ></div>
       )}
 
-      {drawer.userDrawer && (
+      {/*drawer.userDrawer && (
         <div
           className="navbar w-64 absolute
               bg-white top-0 z-50 right-0  navbar-open"
@@ -177,23 +180,23 @@ function App ({
             )}
           </div>
         </div>
-      )}
+      )*/}
 
-      {drawer.userDrawer && (
-        <div
-          onClick={handleUserSidebar}
-          style={{
-            background: '#000',
-            position: 'fixed',
-            opacity: 0.6,
-            zIndex: 10,
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh'
-          }}
-        />
-      )}
+      { drawer.userDrawer &&
+        <UserSlide 
+          open={!!drawer.userDrawer}
+          onClose={handleUserSidebar}>
+
+          {app_user ? (
+            <UserProfileCard 
+              width={'300px'} 
+            />
+          ) : (
+            <Progress />
+          )}
+
+        </UserSlide>
+      }
 
       {loading || !app && <LoadingView />}
 
@@ -220,7 +223,11 @@ function App ({
             </button>
           </div>
 
-          {app && (
+          { !isEmpty(upgradePages) &&
+            <UpgradePage page={upgradePages}/>
+          }
+
+          {app && isEmpty(upgradePages) && (
             <Switch>
               <Route path={`${match.url}/`} exact>
                 <Dashboard />
@@ -232,6 +239,10 @@ function App ({
 
               <Route path={`${match.url}/settings`}>
                 <Settings />
+              </Route>
+
+              <Route path={`${match.url}/messenger`}>
+                <MessengerSettings />
               </Route>
 
               <Route path={`${match.url}/team`}>
@@ -307,7 +318,8 @@ function mapStateToProps (state) {
     app_users,
     current_user,
     navigation,
-    paddleSubscription
+    paddleSubscription,
+    upgradePages
   } = state
   const { loading, isAuthenticated } = auth
   const { current_section } = navigation
@@ -321,7 +333,8 @@ function mapStateToProps (state) {
     isAuthenticated,
     current_section,
     drawer,
-    paddleSubscription
+    paddleSubscription,
+    upgradePages
   }
 }
 
